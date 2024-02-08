@@ -6,6 +6,7 @@ edition = "2021"
 description = "Linux system utils library"
 license = "AGPL-3.0-or-later"
 repository = "https://github.com/cpy-dev/sysutil"
+readme = "README.md"
 
 [lib]
 path = "./src/sysutil-lib.rs"
