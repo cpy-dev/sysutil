@@ -1,0 +1,12 @@
+[package]
+name = "sysutil"
+version = "0.1.0"
+authors = ["cpy-dev"]
+edition = "2021"
+description = "Linux system utils library"
+license = "AGPL-3"
+repository = "https://github.com/cpy-dev/sysutil"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
