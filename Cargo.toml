@@ -4,7 +4,7 @@ version = "0.1.0"
 authors = ["cpy-dev"]
 edition = "2021"
 description = "Linux system utils library"
-license = "AGPL-3"
+license = "AGPL-3.0-or-later"
 repository = "https://github.com/cpy-dev/sysutil"
 
 [lib]
