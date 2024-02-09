@@ -1,8 +1,6 @@
 #![allow(non_snake_case)]
-#![allow(dead_code)]
 
 use std::fs;
-use std::fs::read_dir;
 use std::io::Read;
 use std::path;
 use std::path::Path;
@@ -10,9 +8,7 @@ use std::thread;
 use std::time::Duration;
 
 fn readFile<T>(filePath: T) -> String
-where
-    T: AsRef<Path>,
-{
+where T: AsRef<Path>, {
     match fs::File::open(filePath) {
         Err(_) => {
             return String::new();
@@ -93,8 +89,8 @@ pub fn battery() -> Option<Battery> {
 
 pub fn gpuUsage() -> Option<f32> {
     let fileContent = readFile("/sys/class/drm/card0/device/gpu_busy_percent");
-    let gpu_usage = fileContent.parse::<f32>().ok()?;
-    Some(gpu_usage)
+    let gpuUsage = fileContent.parse::<f32>().ok()?;
+    return Some(gpuUsage);
 }
 
 #[derive(Debug)]
@@ -188,19 +184,33 @@ pub fn cpuUsage() -> CpuUsage {
         let delta: f32 = (afterSum - beforeSum) as f32;
 
         processors.push(ProcessorUsage {
-            total: { 100_f32 - (afterLine[3] - beforeLine[3]) as f32 * 100_f32 / delta },
-            user: { (afterLine[0] - beforeLine[0]) as f32 * 100_f32 / delta },
-            nice: { (afterLine[1] - beforeLine[1]) as f32 * 100_f32 / delta },
-            system: { (afterLine[2] - beforeLine[2]) as f32 * 100_f32 / delta },
-            idle: { (afterLine[3] - beforeLine[3]) as f32 * 100_f32 / delta },
-            iowait: { (afterLine[4] - beforeLine[4]) as f32 * 100_f32 / delta },
-            interrupt: { (afterLine[5] - beforeLine[5]) as f32 * 100_f32 / delta },
-            soft_interrupt: { (afterLine[6] - beforeLine[6]) as f32 * 100_f32 / delta },
+            total: {
+                100_f32 - (afterLine[3] - beforeLine[3]) as f32 * 100_f32 / delta
+            },
+            user: {
+                (afterLine[0] - beforeLine[0]) as f32 * 100_f32 / delta
+            },
+            nice: {
+                (afterLine[1] - beforeLine[1]) as f32 * 100_f32 / delta
+            },
+            system: {
+                (afterLine[2] - beforeLine[2]) as f32 * 100_f32 / delta
+            },
+            idle: {
+                (afterLine[3] - beforeLine[3]) as f32 * 100_f32 / delta
+            },
+            iowait: {
+                (afterLine[4] - beforeLine[4]) as f32 * 100_f32 / delta
+            },
+            interrupt: {
+                (afterLine[5] - beforeLine[5]) as f32 * 100_f32 / delta
+            },
+            soft_interrupt: {
+                (afterLine[6] - beforeLine[6]) as f32 * 100_f32 / delta
+            },
         });
     }
 
-    /*;
-     */
     return CpuUsage {
         average: processors[0].clone(),
         processors: processors[1..].to_vec(),
@@ -334,7 +344,6 @@ pub fn temperatureSensors() -> Vec<TemperatureSensor> {
             temperature: temperature.parse::<f32>().unwrap_or(0_f32) / 1000_f32,
         });
     }
-    println!("{:?}", sensors);
     return sensors;
 }
 
@@ -367,7 +376,7 @@ pub fn cpuInfo() -> Cpu {
     let mut coreCount: usize = 0;
     let mut dieCount: usize = 0;
 
-    for processor in read_dir(baseDir).unwrap() {
+    for processor in fs::read_dir(baseDir).unwrap() {
         let processorPath = processor.unwrap().path();
         let path = processorPath.to_str().unwrap();
 
@@ -405,7 +414,7 @@ pub fn cpuInfo() -> Cpu {
 
     let mut maxFrequency: usize = 0;
 
-    for dir in read_dir(policiesPath).unwrap() {
+    for dir in fs::read_dir(policiesPath).unwrap() {
         let path = dir.unwrap().path();
         let sPath = path.to_str().unwrap();
 
@@ -502,7 +511,7 @@ pub fn schedulerInfo() -> Vec<SchedulerPolicy> {
     let schedulerDir = path::Path::new("/sys/devices/system/cpu/cpufreq/");
     let mut policies = Vec::<SchedulerPolicy>::new();
 
-    for dir in read_dir(schedulerDir).unwrap() {
+    for dir in fs::read_dir(schedulerDir).unwrap() {
         let path = dir.unwrap().path();
         let sPath = path.to_str().unwrap();
 
@@ -512,15 +521,13 @@ pub fn schedulerInfo() -> Vec<SchedulerPolicy> {
             let scalingGovernor = readFile(format!("{sPath}/scaling_governor").as_str());
             let scalingDriver = readFile(format!("{sPath}/scaling_driver").as_str());
 
-            let maxScalingFrequency = readFile(format!("{sPath}/scaling_max_freq").as_str())
-                .parse::<f32>()
-                .unwrap()
-                / 1000_f32;
+            let maxScalingFrequency = readFile(
+                format!("{sPath}/scaling_max_freq").as_str()
+            ).parse::<f32>().unwrap() / 1000_f32;
 
-            let minScalingFrequency = readFile(format!("{sPath}/scaling_min_freq").as_str())
-                .parse::<f32>()
-                .unwrap()
-                / 1000_f32;
+            let minScalingFrequency = readFile(
+                format!("{sPath}/scaling_min_freq").as_str()
+            ).parse::<f32>().unwrap() / 1000_f32;
 
             policies.push(SchedulerPolicy {
                 name: policyName,
