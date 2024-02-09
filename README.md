@@ -79,6 +79,29 @@ pub struct TemperatureSensor {
 ```
 - contains sensor name (label) and the recorded temperature
 
+### Battery
+
+```rust
+pub struct Battery {
+    capacity: u8,
+    status: BatteryStatus, 
+}
+```
+
+- contains capacity and status of battery
+
+### BatteryStatus
+
+```rust
+enum BatteryStatus {
+    Charging,
+    Discharging,
+    Full,
+}
+```
+
+- represents status of battery
+
 ## Functions
 ```rust
 pub fn cpuUsage() -> CpuUsage
@@ -124,3 +147,8 @@ pub fn gpuUsage() -> f32
 ```
 - returns gpu usage percentage
 - yet tested only on AMD 7000 series GPUs
+
+```rust
+pub fn battery() -> Option<Battery> 
+```
+- returns battery status and capacity
