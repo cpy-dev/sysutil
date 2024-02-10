@@ -14,7 +14,7 @@ cargo add sysutil
 ...
 
 [dependencies]
-sysutil = "0.2.0"
+sysutil = "0.2.1"
 ```
 
 ## Python
