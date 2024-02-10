@@ -692,7 +692,7 @@ fn getRoutes(file: String, separator: &str, routeType: RouteType) -> Vec<Network
 }
 
 pub fn networkRoutes() -> Vec<NetworkRoute> {
-    let mut routes: Vec<NetworkRoute> = Vec::<Route>::new();
+    let mut routes: Vec<NetworkRoute> = Vec::<NetworkRoute>::new();
 
     routes.append(
         &mut getRoutes(readFile("/proc/net/tcp"), ".", RouteType::TCP)
