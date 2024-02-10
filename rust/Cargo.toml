@@ -1,11 +1,11 @@
 [package]
 name = "sysutil"
-version = "0.2.2"
-authors = ["cpy-dev"]
+version = "0.2.3"
+authors = ["ryzeon-dev"]
 edition = "2021"
 description = "Linux system utils library"
 license = "AGPL-3.0-or-later"
-repository = "https://github.com/cpy-dev/sysutil"
+repository = "https://github.com/ryzeon-dev/sysutil"
 readme = "README.md"
 
 [lib]

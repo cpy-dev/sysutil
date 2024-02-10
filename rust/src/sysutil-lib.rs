@@ -32,7 +32,7 @@ where T: AsRef<Path>, {
 }
 
 #[derive(Debug)]
-enum BatteryStatus {
+pub enum BatteryStatus {
     Charging,
     Discharging,
     Full,
@@ -40,8 +40,8 @@ enum BatteryStatus {
 
 #[derive(Debug)]
 pub struct Battery {
-    capacity: u8,
-    status: BatteryStatus,
+    pub capacity: u8,
+    pub status: BatteryStatus,
 }
 
 impl Battery {
@@ -98,20 +98,20 @@ pub fn gpuUsage() -> Option<f32> {
 
 #[derive(Debug)]
 pub struct CpuUsage {
-    average: ProcessorUsage,
-    processors: Vec<ProcessorUsage>,
+    pub average: ProcessorUsage,
+    pub processors: Vec<ProcessorUsage>,
 }
 
 #[derive(Clone, Debug)]
 pub struct ProcessorUsage {
-    total: f32,
-    user: f32,
-    nice: f32,
-    system: f32,
-    idle: f32,
-    iowait: f32,
-    interrupt: f32,
-    soft_interrupt: f32,
+    pub total: f32,
+    pub user: f32,
+    pub nice: f32,
+    pub system: f32,
+    pub idle: f32,
+    pub iowait: f32,
+    pub interrupt: f32,
+    pub soft_interrupt: f32,
 }
 
 impl ProcessorUsage {
@@ -307,8 +307,8 @@ fn getRate() -> (usize, usize) {
 
 #[derive(Debug)]
 pub struct NetworkRate {
-    download: f32,
-    upload: f32,
+    pub download: f32,
+    pub upload: f32,
 }
 
 pub fn networkRate() -> NetworkRate {
@@ -327,8 +327,8 @@ pub fn networkRate() -> NetworkRate {
 
 #[derive(Debug)]
 pub struct TemperatureSensor {
-    label: String,
-    temperature: Option<f32>,
+    pub label: String,
+    pub temperature: Option<f32>,
 }
 
 pub fn temperatureSensors() -> Vec<TemperatureSensor> {
@@ -356,15 +356,15 @@ pub fn temperatureSensors() -> Vec<TemperatureSensor> {
 
 #[derive(Debug)]
 pub struct Cpu {
-    modelName: String,
-    cores: usize,
-    threads: usize,
-    dies: usize,
-    governors: Vec<String>,
-    maxFrequencyMHz: f32,
-    clockBoost: Option<bool>,
-    architecture: String,
-    byteOrder: String
+    pub modelName: String,
+    pub cores: usize,
+    pub threads: usize,
+    pub dies: usize,
+    pub governors: Vec<String>,
+    pub maxFrequencyMHz: f32,
+    pub clockBoost: Option<bool>,
+    pub architecture: String,
+    pub byteOrder: String
 }
 
 pub fn cpuInfo() -> Cpu {
@@ -511,8 +511,8 @@ pub fn cpuInfo() -> Cpu {
 
 #[derive(Debug)]
 pub struct RamSize {
-    gb: f32,
-    gib: f32,
+    pub gb: f32,
+    pub gib: f32,
 }
 
 pub fn ramSize() -> RamSize {
@@ -544,11 +544,11 @@ pub fn ramSize() -> RamSize {
 
 #[derive(Debug)]
 pub struct SchedulerPolicy {
-    name: String,
-    scalingGovernor: String,
-    scalingDriver: String,
-    minimumScalingMHz: f32,
-    maximumScalingMHz: f32,
+    pub name: String,
+    pub scalingGovernor: String,
+    pub scalingDriver: String,
+    pub minimumScalingMHz: f32,
+    pub maximumScalingMHz: f32,
 }
 
 pub fn schedulerInfo() -> Vec<SchedulerPolicy> {
@@ -588,8 +588,8 @@ pub fn schedulerInfo() -> Vec<SchedulerPolicy> {
 
 #[derive(Debug)]
 pub struct VramSize {
-    gb: f32,
-    gib: f32
+    pub gb: f32,
+    pub gib: f32
 }
 
 pub fn vramSize() -> Option<VramSize> {
@@ -631,11 +631,11 @@ pub enum RouteType {
 
 #[derive(Debug)]
 pub struct NetworkRoute {
-    routeType: RouteType,
-    localAddress: String,
-    localPort: u16,
-    remoteAddress: String,
-    remotePort: u16
+    pub routeType: RouteType,
+    pub localAddress: String,
+    pub localPort: u16,
+    pub remoteAddress: String,
+    pub remotePort: u16
 }
 
 fn bytesToAddress(address: String, separator: &str) -> String {
