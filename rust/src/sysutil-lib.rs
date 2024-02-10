@@ -659,8 +659,8 @@ fn bytesToPort(port: String) -> u16 {
     ((i64::from_str_radix(MSB, 16).unwrap() as u16) << 8) + (i64::from_str_radix(LSB, 16).unwrap() as u16)
 }
 
-fn getRoutes(file: String, separator: &str, routeType: RouteType) -> Vec<Route> {
-    let mut routes = Vec::<Route>::new();
+fn getRoutes(file: String, separator: &str, routeType: RouteType) -> Vec<NetworkRoute> {
+    let mut routes = Vec::<NetworkRoute>::new();
 
     for line in file.split("\n") {
         if !line.contains(":") {
@@ -678,7 +678,7 @@ fn getRoutes(file: String, separator: &str, routeType: RouteType) -> Vec<Route> 
         let remotePort = bytesToPort(remote[1].to_string());
 
         routes.push(
-            Route {
+            NetworkRoute {
                 routeType: routeType.clone(),
                 localAddress: localAddress,
                 localPort: localPort,
@@ -691,8 +691,8 @@ fn getRoutes(file: String, separator: &str, routeType: RouteType) -> Vec<Route> 
     return routes;
 }
 
-pub fn networkRoutes() -> Vec<Route> {
-    let mut routes: Vec<Route> = Vec::<Route>::new();
+pub fn networkRoutes() -> Vec<NetworkRoute> {
+    let mut routes: Vec<NetworkRoute> = Vec::<Route>::new();
 
     routes.append(
         &mut getRoutes(readFile("/proc/net/tcp"), ".", RouteType::TCP)
