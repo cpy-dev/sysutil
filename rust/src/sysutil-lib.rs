@@ -1,9 +1,11 @@
 #![allow(non_snake_case)]
 
+use std::fmt::format;
 use std::fs;
 use std::io::Read;
 use std::path;
 use std::path::Path;
+use std::process::Command;
 use std::thread;
 use std::time::Duration;
 
@@ -68,7 +70,7 @@ fn battery_path() -> Option<path::PathBuf> {
         .find_map(|handle| handle?.join().ok()?)
 }
 
-pub fn battery() -> Option<Battery> {
+pub fn batteryInfo() -> Option<Battery> {
     let battery_path = battery_path()?;
     let capacity = readFile(battery_path.join("capacity"));
     let status = readFile(battery_path.join("status"));
@@ -217,7 +219,7 @@ pub fn cpuUsage() -> CpuUsage {
     };
 }
 
-pub fn cpuFrequency() -> f32 {
+pub fn cpuFrequency() -> Option<f32> {
     let fileContent = readFile("/proc/cpuinfo");
     let mut frequencies: f32 = 0.0;
     let mut count = 0;
@@ -229,7 +231,11 @@ pub fn cpuFrequency() -> f32 {
         }
     }
 
-    return frequencies / (count as f32);
+    if frequencies != 0_f32 {
+        return Some(frequencies / (count as f32));
+    }
+
+    return None;
 }
 
 pub fn ramUsage() -> f32 {
@@ -321,7 +327,7 @@ pub fn networkRate() -> NetworkRate {
 #[derive(Debug)]
 pub struct TemperatureSensor {
     label: String,
-    temperature: f32,
+    temperature: Option<f32>,
 }
 
 pub fn temperatureSensors() -> Vec<TemperatureSensor> {
@@ -341,7 +347,7 @@ pub fn temperatureSensors() -> Vec<TemperatureSensor> {
 
         sensors.push(TemperatureSensor {
             label: label,
-            temperature: temperature.parse::<f32>().unwrap_or(0_f32) / 1000_f32,
+            temperature: Some(temperature.parse::<f32>().unwrap() / 1000_f32),
         });
     }
     return sensors;
@@ -355,7 +361,9 @@ pub struct Cpu {
     dies: usize,
     governors: Vec<String>,
     maxFrequencyMHz: f32,
+    clockBoost: Option<bool>,
     architecture: String,
+    byteOrder: String
 }
 
 pub fn cpuInfo() -> Cpu {
@@ -386,18 +394,24 @@ pub fn cpuInfo() -> Cpu {
             let dieId = readFile(format!("{path}/topology/die_id").as_str());
 
             if !coreId.is_empty() {
-                let cid = coreId.parse::<usize>().unwrap();
-
-                if cid > coreCount {
-                    coreCount = cid;
+                match coreId.parse::<usize>() {
+                    Err(_) => (),
+                    Ok(uCoreId) => {
+                        if uCoreId > coreCount {
+                            coreCount = uCoreId;
+                        }
+                    }
                 }
             }
 
             if !dieId.is_empty() {
-                let did = dieId.parse::<usize>().unwrap();
-
-                if did > dieCount {
-                    dieCount = did;
+                match dieId.parse::<usize>() {
+                    Err(_) => (),
+                    Ok(uDieId) => {
+                        if uDieId > dieCount {
+                            dieCount = uDieId;
+                        }
+                    }
                 }
             }
         }
@@ -413,6 +427,7 @@ pub fn cpuInfo() -> Cpu {
     let policiesPath = Path::new("/sys/devices/system/cpu/cpufreq/");
 
     let mut maxFrequency: usize = 0;
+    let mut clockBoost: Option<bool> = None;
 
     for dir in fs::read_dir(policiesPath).unwrap() {
         let path = dir.unwrap().path();
@@ -438,6 +453,14 @@ pub fn cpuInfo() -> Cpu {
                     governors.push(governor.to_string());
                 }
             }
+        } else if sPath.contains("boost") {
+            let content = readFile(sPath);
+
+            if content.trim() == "1" {
+                clockBoost = Some(true);
+            } else {
+                clockBoost = Some(false);
+            }
         }
     }
 
@@ -454,6 +477,24 @@ pub fn cpuInfo() -> Cpu {
         }
     };
 
+    let pipe = Command::new("sh").arg("-c").args(
+        ["echo -n I | od -t o2 | head -n 1 | cut -f 2 -d \" \" | cut -c 6"]
+    ).output().unwrap().stdout;
+
+    let byteOrder;
+    match String::from_utf8(pipe).unwrap().trim() {
+        "1" => {
+            byteOrder = String::from("Little Endian");
+        },
+        "0" => {
+            byteOrder = String::from("Big Endian");
+        },
+
+        _ => {
+            byteOrder = String::new();
+        }
+    };
+
     return Cpu {
         modelName: modelName,
         cores: coreCount,
@@ -461,7 +502,9 @@ pub fn cpuInfo() -> Cpu {
         dies: dieCount,
         governors: governors,
         maxFrequencyMHz: freqMHz,
+        clockBoost: clockBoost,
         architecture: arch,
+        byteOrder: byteOrder,
     };
 }
 
@@ -560,7 +603,7 @@ mod tests {
         println!("{:?}", ramSize());
         println!("{:?}", schedulerInfo());
 
-        println!("{:?}", battery());
+        println!("{:?}", batteryInfo());
         assert_eq!(String::new(), String::new());
     }
 }

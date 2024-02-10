@@ -1,2 +1,3 @@
-/target
-/.idea
+/rust/target
+/rust/.idea
+/python3/.idea
