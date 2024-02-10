@@ -3,7 +3,7 @@
 - available for both Rust and Python
 
 ## Rust
-### [Rust Documentation](https://github.com/ryzeon-dev/sysutil/rust/README.md)
+### [Rust Documentation](https://github.com/ryzeon-dev/sysutil/blob/master/rust/README.md)
 ### Installation
 - run in terminal
 ```bash
@@ -18,7 +18,7 @@ sysutil = "0.2.1"
 ```
 
 ## Python
-### [Python Documentation](https://github.com/ryzeon-dev/sysutil/python3/README.md)
+### [Python Documentation](https://github.com/ryzeon-dev/sysutil/blob/master/python3/README.md)
 ### Installation
 ```bash
 pip install sysutil-lib
