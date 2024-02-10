@@ -1,6 +1,6 @@
 #![allow(non_snake_case)]
+#![allow(dead_code)]
 
-use std::fmt::format;
 use std::fs;
 use std::io::Read;
 use std::path;
@@ -585,6 +585,41 @@ pub fn schedulerInfo() -> Vec<SchedulerPolicy> {
     return policies;
 }
 
+#[derive(Debug)]
+pub struct VramSize {
+    gb: f32,
+    gib: f32
+}
+
+pub fn vramSize() -> Option<VramSize> {
+    let fileContent = readFile("/sys/class/drm/card0/device/mem_info_vram_total");
+    match fileContent.parse::<usize>() {
+        Err(_) => {
+            return None
+        },
+        Ok(uMem) => {
+            return Some(VramSize {
+                gb: uMem as f32 / 1000_f32 / 1000_f32 / 1000_f32,
+                gib: uMem as f32 / 1024_f32 / 1024_f32 / 1024_f32
+            })
+        }
+    };
+}
+
+pub fn vramUsage() -> Option<f32> {
+    let vramTotal = readFile("/sys/class/drm/card0/device/mem_info_vram_total");
+    let vramUsed = readFile("/sys/class/drm/card0/device/mem_info_vram_used");
+
+    if vramTotal.is_empty() || vramUsed.is_empty() {
+        return None;
+    }
+
+    let uVramTotal: usize = vramTotal.parse::<usize>().unwrap();
+    let uVramUsed: usize = vramUsed.parse::<usize>().unwrap();
+
+    return Some(uVramUsed as f32 * 100_f32 / uVramTotal as f32);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -604,6 +639,10 @@ mod tests {
         println!("{:?}", schedulerInfo());
 
         println!("{:?}", batteryInfo());
+        println!("{:?}", vramSize());
+
+        println!("VRAM usage: {:?}", vramUsage());
+
         assert_eq!(String::new(), String::new());
     }
 }

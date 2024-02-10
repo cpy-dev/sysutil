@@ -64,6 +64,12 @@ class SchedulerPolicy:
     minimumScalingMHz: float
     maximumScalingMHz: float
 
+@dataclasses.dataclass
+class VramSize:
+    gb: float
+    gib: float
+
+
 def __batteryPath():
     DRIVER_DIR = '/sys/class/power_supply'
     batteries = []
@@ -439,6 +445,37 @@ def schedulerInfo():
 
     return policies
 
+def vramSize():
+    try:
+        with open('/sys/class/drm/card0/device/mem_info_vram_total', 'r') as file:
+            fileContent = file.read()
+
+        intSize = int(fileContent.strip())
+
+        return VramSize(
+            gb=intSize / 1000 / 1000 / 1000,
+            gib=intSize / 1024 / 1024 / 1024
+        )
+    except:
+        return None
+
+def vramUsage():
+    try:
+        with open('/sys/class/drm/card0/device/mem_info_vram_total', 'r') as file:
+            fileContent = file.read()
+
+        intSize = int(fileContent.strip())
+
+        with open('/sys/class/drm/card0/device/mem_info_vram_used', 'r') as file:
+            fileContent = file.read()
+
+        intUsed = int(fileContent.strip())
+
+        return intUsed * 100 / intSize
+
+    except:
+        return None
+
 if __name__ == '__main__':
     print(cpuUsage())
     print(f'RAM usage:', ramUsage())
@@ -453,3 +490,6 @@ if __name__ == '__main__':
     print(schedulerInfo())
 
     print(batteryInfo())
+    print(vramSize())
+
+    print('VRAM usage:', vramUsage())

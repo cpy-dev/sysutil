@@ -1,6 +1,11 @@
 # sysutil-lib
 - Linux system information library
 
+## Importation
+```python
+import sysutil
+```
+
 ## Data structures
 ### ProcessorUsage
 ```python3
@@ -82,6 +87,14 @@ class Battery:
 ```
 - contains capacity and status of battery
 
+### VramSize
+```python3
+class VramSize:
+    gb: float
+    gib: float
+```
+- contains total gpu's vram size, both in GB (1000^3 bytes) and GiB (1024^3 bytes)
+
 ## Functions
 
 ## Functions
@@ -134,3 +147,13 @@ def gpuUsage() -> float
 def batteryInfo() -> Battery 
 ```
 - returns battery status and capacity
+
+```python3
+def vramSize() -> VramSize
+```
+- returns vram size as specified in the `VramSize` data structure
+
+```python3
+def vramUsage() -> float
+```
+- returns vram usage percentage

@@ -109,6 +109,15 @@ enum BatteryStatus {
 
 - represents status of battery
 
+### VramSize
+```rust
+pub struct VramSize {
+    gb: f32,
+    gib: f32
+}
+```
+- contains total gpu's vram size, both in GB (1000^3 bytes) and GiB (1024^3 bytes)
+
 ## Functions
 ```rust
 pub fn cpuUsage() -> CpuUsage
@@ -159,3 +168,13 @@ pub fn gpuUsage() -> Option<f32>
 pub fn batteryInfo() -> Option<Battery> 
 ```
 - returns battery status and capacity
+
+```rust
+pub fn vramSize() -> Option<VramSize>
+```
+- returns vram size as specified in the `VramSize` data structure
+
+```rust
+pub fn vramUsage() -> Option<float>
+```
+- returns vram usage percentage
