@@ -2,33 +2,25 @@
 #![allow(dead_code)]
 
 use std::fs;
+use std::i64;
 use std::io::Read;
 use std::path;
 use std::path::Path;
 use std::process::Command;
 use std::thread;
 use std::time::Duration;
-use std::i64;
 
+#[rustfmt::skip]
 fn readFile<T>(filePath: T) -> String
 where T: AsRef<Path>, {
-    match fs::File::open(filePath) {
-        Err(_) => {
-            return String::new();
+    if let Ok(mut file) = fs::File::open(filePath) {
+        let mut buffer = String::new();
+        if let Ok(_) = file.read_to_string(&mut buffer) {
+            return buffer.trim().to_string();
         }
-        Ok(mut file) => {
-            let mut buffer = String::new();
+    }
 
-            match file.read_to_string(&mut buffer) {
-                Err(_) => {
-                    return String::new();
-                }
-                Ok(_) => {
-                    return buffer.trim().to_string();
-                }
-            }
-        }
-    };
+    return String::new();
 }
 
 #[derive(Debug)]
@@ -186,6 +178,7 @@ pub fn cpuUsage() -> CpuUsage {
 
         let delta: f32 = (afterSum - beforeSum) as f32;
 
+        #[rustfmt::skip]
         processors.push(ProcessorUsage {
             total: {
                 100_f32 - (afterLine[3] - beforeLine[3]) as f32 * 100_f32 / delta
@@ -348,7 +341,7 @@ pub fn temperatureSensors() -> Vec<TemperatureSensor> {
 
         sensors.push(TemperatureSensor {
             label: label,
-            temperature: Some(temperature.parse::<f32>().unwrap() / 1000_f32),
+            temperature: temperature.parse::<f32>().ok(),
         });
     }
     return sensors;
@@ -364,7 +357,7 @@ pub struct Cpu {
     pub maxFrequencyMHz: f32,
     pub clockBoost: Option<bool>,
     pub architecture: String,
-    pub byteOrder: String
+    pub byteOrder: String,
 }
 
 pub fn cpuInfo() -> Cpu {
@@ -478,18 +471,21 @@ pub fn cpuInfo() -> Cpu {
         }
     };
 
-    let pipe = Command::new("sh").arg("-c").args(
-        ["echo -n I | od -t o2 | head -n 1 | cut -f 2 -d \" \" | cut -c 6"]
-    ).output().unwrap().stdout;
+    let pipe = Command::new("sh")
+        .arg("-c")
+        .args(["echo -n I | od -t o2 | head -n 1 | cut -f 2 -d \" \" | cut -c 6"])
+        .output()
+        .unwrap()
+        .stdout;
 
     let byteOrder;
     match String::from_utf8(pipe).unwrap().trim() {
         "1" => {
             byteOrder = String::from("Little Endian");
-        },
+        }
         "0" => {
             byteOrder = String::from("Big Endian");
-        },
+        }
 
         _ => {
             byteOrder = String::new();
@@ -565,13 +561,15 @@ pub fn schedulerInfo() -> Vec<SchedulerPolicy> {
             let scalingGovernor = readFile(format!("{sPath}/scaling_governor").as_str());
             let scalingDriver = readFile(format!("{sPath}/scaling_driver").as_str());
 
-            let maxScalingFrequency = readFile(
-                format!("{sPath}/scaling_max_freq").as_str()
-            ).parse::<f32>().unwrap() / 1000_f32;
+            let maxScalingFrequency = readFile(format!("{sPath}/scaling_max_freq").as_str())
+                .parse::<f32>()
+                .unwrap()
+                / 1000_f32;
 
-            let minScalingFrequency = readFile(
-                format!("{sPath}/scaling_min_freq").as_str()
-            ).parse::<f32>().unwrap() / 1000_f32;
+            let minScalingFrequency = readFile(format!("{sPath}/scaling_min_freq").as_str())
+                .parse::<f32>()
+                .unwrap()
+                / 1000_f32;
 
             policies.push(SchedulerPolicy {
                 name: policyName,
@@ -589,19 +587,17 @@ pub fn schedulerInfo() -> Vec<SchedulerPolicy> {
 #[derive(Debug)]
 pub struct VramSize {
     pub gb: f32,
-    pub gib: f32
+    pub gib: f32,
 }
 
 pub fn vramSize() -> Option<VramSize> {
     let fileContent = readFile("/sys/class/drm/card0/device/mem_info_vram_total");
     match fileContent.parse::<usize>() {
-        Err(_) => {
-            return None
-        },
+        Err(_) => return None,
         Ok(uMem) => {
             return Some(VramSize {
                 gb: uMem as f32 / 1000_f32 / 1000_f32 / 1000_f32,
-                gib: uMem as f32 / 1024_f32 / 1024_f32 / 1024_f32
+                gib: uMem as f32 / 1024_f32 / 1024_f32 / 1024_f32,
             })
         }
     };
@@ -626,7 +622,7 @@ pub enum RouteType {
     TCP,
     TCP6,
     UDP,
-    UDP6
+    UDP6,
 }
 
 #[derive(Debug)]
@@ -635,7 +631,7 @@ pub struct NetworkRoute {
     pub localAddress: String,
     pub localPort: u16,
     pub remoteAddress: String,
-    pub remotePort: u16
+    pub remotePort: u16,
 }
 
 fn bytesToAddress(address: String, separator: &str) -> String {
@@ -643,9 +639,11 @@ fn bytesToAddress(address: String, separator: &str) -> String {
 
     let mut index: usize = 0;
     while index < address.len() {
-        chunks.push(
-            String::from(i64::from_str_radix(&address[index..index+2], 16).unwrap().to_string())
-        );
+        chunks.push(String::from(
+            i64::from_str_radix(&address[index..index + 2], 16)
+                .unwrap()
+                .to_string(),
+        ));
         index += 2;
     }
 
@@ -656,7 +654,8 @@ fn bytesToAddress(address: String, separator: &str) -> String {
 
 fn bytesToPort(port: String) -> u16 {
     let (LSB, MSB) = port.split_at(2);
-    ((i64::from_str_radix(MSB, 16).unwrap() as u16) << 8) + (i64::from_str_radix(LSB, 16).unwrap() as u16)
+    ((i64::from_str_radix(MSB, 16).unwrap() as u16) << 8)
+        + (i64::from_str_radix(LSB, 16).unwrap() as u16)
 }
 
 fn getRoutes(file: String, separator: &str, routeType: RouteType) -> Vec<NetworkRoute> {
@@ -677,20 +676,19 @@ fn getRoutes(file: String, separator: &str, routeType: RouteType) -> Vec<Network
         let remoteAddress = bytesToAddress(remote[0].to_string(), separator);
         let remotePort = bytesToPort(remote[1].to_string());
 
-        routes.push(
-            NetworkRoute {
-                routeType: routeType.clone(),
-                localAddress: localAddress,
-                localPort: localPort,
-                remoteAddress: remoteAddress,
-                remotePort: remotePort
-            }
-        );
+        routes.push(NetworkRoute {
+            routeType: routeType.clone(),
+            localAddress: localAddress,
+            localPort: localPort,
+            remoteAddress: remoteAddress,
+            remotePort: remotePort,
+        });
     }
 
     return routes;
 }
 
+#[rustfmt::skip]
 pub fn networkRoutes() -> Vec<NetworkRoute> {
     let mut routes: Vec<NetworkRoute> = Vec::<NetworkRoute>::new();
 
