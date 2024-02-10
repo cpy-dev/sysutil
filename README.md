@@ -21,5 +21,5 @@ sysutil = "0.2.0"
 ### [Python Documentation](https://github.com/ryzeon-dev/sysutil/python3/README.md)
 ### Installation
 ```bash
-pip install sysutil
+pip install sysutil-lib
 ```
