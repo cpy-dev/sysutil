@@ -118,6 +118,28 @@ pub struct VramSize {
 ```
 - contains total gpu's vram size, both in GB (1000^3 bytes) and GiB (1024^3 bytes)
 
+### RouteType
+```rust
+pub enum RouteType {
+    TCP,
+    TCP6,
+    UDP,
+    UDP6
+}
+```
+
+### NetworkRoute
+```rust
+pub struct NetworkRoute {
+    routeType: RouteType,
+    localAddress: String,
+    localPort: u16,
+    remoteAddress: String,
+    remotePort: u16
+}
+```
+- represents a network route and its type
+
 ## Functions
 ```rust
 pub fn cpuUsage() -> CpuUsage
@@ -175,6 +197,11 @@ pub fn vramSize() -> Option<VramSize>
 - returns vram size as specified in the `VramSize` data structure
 
 ```rust
-pub fn vramUsage() -> Option<float>
+pub fn vramUsage() -> Option<f32>
 ```
 - returns vram usage percentage
+
+```rust
+pub fn networkRoutes() -> Vec<Route>
+```
+- returns a list containing each internal network route

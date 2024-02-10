@@ -8,6 +8,7 @@ use std::path::Path;
 use std::process::Command;
 use std::thread;
 use std::time::Duration;
+use std::i64;
 
 fn readFile<T>(filePath: T) -> String
 where T: AsRef<Path>, {
@@ -620,6 +621,98 @@ pub fn vramUsage() -> Option<f32> {
     return Some(uVramUsed as f32 * 100_f32 / uVramTotal as f32);
 }
 
+#[derive(Debug, Clone)]
+pub enum RouteType {
+    TCP,
+    TCP6,
+    UDP,
+    UDP6
+}
+
+#[derive(Debug)]
+pub struct NetworkRoute {
+    routeType: RouteType,
+    localAddress: String,
+    localPort: u16,
+    remoteAddress: String,
+    remotePort: u16
+}
+
+fn bytesToAddress(address: String, separator: &str) -> String {
+    let mut chunks = Vec::<String>::new();
+
+    let mut index: usize = 0;
+    while index < address.len() {
+        chunks.push(
+            String::from(i64::from_str_radix(&address[index..index+2], 16).unwrap().to_string())
+        );
+        index += 2;
+    }
+
+    chunks.reverse();
+
+    return chunks.join(separator);
+}
+
+fn bytesToPort(port: String) -> u16 {
+    let (LSB, MSB) = port.split_at(2);
+    ((i64::from_str_radix(MSB, 16).unwrap() as u16) << 8) + (i64::from_str_radix(LSB, 16).unwrap() as u16)
+}
+
+fn getRoutes(file: String, separator: &str, routeType: RouteType) -> Vec<Route> {
+    let mut routes = Vec::<Route>::new();
+
+    for line in file.split("\n") {
+        if !line.contains(":") {
+            continue;
+        }
+
+        let splittedLine: Vec<&str> = line.trim().split(" ").collect();
+        let local: Vec<&str> = splittedLine[1].split(":").collect();
+
+        let localAddress = bytesToAddress(local[0].to_string(), separator);
+        let localPort = bytesToPort(local[1].to_string());
+
+        let remote: Vec<&str> = splittedLine[2].split(":").collect();
+        let remoteAddress = bytesToAddress(remote[0].to_string(), separator);
+        let remotePort = bytesToPort(remote[1].to_string());
+
+        routes.push(
+            Route {
+                routeType: routeType.clone(),
+                localAddress: localAddress,
+                localPort: localPort,
+                remoteAddress: remoteAddress,
+                remotePort: remotePort
+            }
+        );
+    }
+
+    return routes;
+}
+
+pub fn networkRoutes() -> Vec<Route> {
+    let mut routes: Vec<Route> = Vec::<Route>::new();
+
+    routes.append(
+        &mut getRoutes(readFile("/proc/net/tcp"), ".", RouteType::TCP)
+    );
+
+    routes.append(
+        &mut getRoutes(readFile("/proc/net/udp"), ".", RouteType::UDP)
+    );
+
+    routes.append(
+        &mut getRoutes(readFile("/proc/net/tcp6"), ":", RouteType::TCP6)
+    );
+
+    routes.append(
+        &mut getRoutes(readFile("/proc/net/udp6"), ":", RouteType::UDP6)
+    );
+
+    return routes;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -642,6 +735,7 @@ mod tests {
         println!("{:?}", vramSize());
 
         println!("VRAM usage: {:?}", vramUsage());
+        println!("{:?}", networkRoutes());
 
         assert_eq!(String::new(), String::new());
     }

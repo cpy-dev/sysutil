@@ -95,6 +95,26 @@ class VramSize:
 ```
 - contains total gpu's vram size, both in GB (1000^3 bytes) and GiB (1024^3 bytes)
 
+### RouteType
+```python3
+class RouteType:
+    TCP = 'tcp'
+    TCP6 = 'tcp6'
+    UDP = 'udp'
+    UDP6 = 'udp6'
+```
+
+### NetworkRoute
+```python3
+class NetworkRoute:
+    routeType: str
+    localAddress: str
+    localPort: int
+    remoteAddress: str
+    remotePort: int
+```
+- represents a network route
+
 ## Functions
 
 ## Functions
@@ -108,7 +128,7 @@ def cpuFrequency() -> float
 - returns CPU frequency in MHz
 
 ```python3
-pub fn ramUsage() -> f32 
+def ramUsage() -> float
 ```
 - returns ram usage percentage
 
@@ -157,3 +177,8 @@ def vramSize() -> VramSize
 def vramUsage() -> float
 ```
 - returns vram usage percentage
+
+```python3
+def networkRoutes() -> [NetworkRoute]
+```
+- returns a list containing each internal network route

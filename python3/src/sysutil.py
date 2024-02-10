@@ -69,6 +69,19 @@ class VramSize:
     gb: float
     gib: float
 
+class RouteType:
+    TCP = 'tcp'
+    TCP6 = 'tcp6'
+    UDP = 'udp'
+    UDP6 = 'udp6'
+
+@dataclasses.dataclass
+class NetworkRoute:
+    routeType: str
+    localAddress: str
+    localPort: int
+    remoteAddress: str
+    remotePort: int
 
 def __batteryPath():
     DRIVER_DIR = '/sys/class/power_supply'
@@ -419,7 +432,6 @@ def schedulerInfo():
             continue
 
         policyName = dir
-        scalingGovernor = ''
 
         with open(f'{DRIVER_DIR}/{dir}/scaling_governor', 'r') as file:
             scalingGovernor = file.read().strip()
@@ -476,6 +488,88 @@ def vramUsage():
     except:
         return None
 
+def __bytesToAddress(address, separator):
+    chunks = []
+
+    for index in range(0, len(address), 2):
+        chunks.append(
+            str(int(address[index:index+2], 16))
+        )
+
+    chunks = chunks[::-1]
+    return separator.join(chunks)
+
+def __bytesToPort(port):
+    LSB = port[:2]
+    MSB = port[2:]
+
+    return (int(MSB, 16) << 8) + (int(LSB, 16))
+
+def __getRoutes(filePath, separator, routeType):
+    routes = []
+
+    try:
+        with open(filePath, 'r') as file:
+            fileContent = file.read()
+
+    except:
+        return []
+
+    for line in fileContent.split('\n'):
+        if ':' not in line:
+            continue
+
+        splittedLine = line.strip().split(' ')
+        local = splittedLine[1].split(':')
+        remote = splittedLine[2].split(':')
+
+        localAddress = __bytesToAddress(local[0], separator)
+        localPort = __bytesToPort(local[1])
+
+        remoteAddress = __bytesToAddress(remote[0], separator)
+        remotePort = __bytesToPort(remote[1])
+
+        routes.append(
+            NetworkRoute (
+                routeType=routeType,
+                localAddress=localAddress,
+                localPort=localPort,
+                remoteAddress=remoteAddress,
+                remotePort=remotePort
+            )
+        )
+
+    return routes
+
+def networkRoutes():
+    routes = []
+
+    routes.extend(
+        __getRoutes(
+            '/proc/net/tcp', '.', RouteType.TCP
+        )
+    )
+
+    routes.extend(
+        __getRoutes(
+            '/proc/net/udp', '.', RouteType.UDP
+        )
+    )
+
+    routes.extend(
+        __getRoutes(
+            '/proc/net/tcp6', ':', RouteType.TCP6
+        )
+    )
+
+    routes.extend(
+        __getRoutes(
+            '/proc/net/udp6', ':', RouteType.UDP6
+        )
+    )
+
+    return routes
+
 if __name__ == '__main__':
     print(cpuUsage())
     print(f'RAM usage:', ramUsage())
@@ -493,3 +587,4 @@ if __name__ == '__main__':
     print(vramSize())
 
     print('VRAM usage:', vramUsage())
+    print(networkRoutes())
