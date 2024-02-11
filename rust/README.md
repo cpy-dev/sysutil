@@ -31,9 +31,9 @@ pub struct CpuUsage {
 ```
 - contains the average CPU usage, and the specific usage for each processor
 
-### Cpu
+### CpuInfo
 ```rust
-pub struct Cpu {
+pub struct CpuInfo {
     modelName: String,
     cores: usize,
     threads: usize,
@@ -140,6 +140,30 @@ pub struct NetworkRoute {
 ```
 - represents a network route and its type
 
+### CPU
+```rust
+pub struct CPU {
+    pub info: CpuInfo,
+    pub averageUsage: ProcessorUsage,
+    pub perProcessorUsage: Vec<ProcessorUsage>,
+    pub schedulerPolicies: Vec<SchedulerPolicy>
+}
+```
+- encloses all cpu data available in the library
+#### Methods
+
+```rust 
+CPU::new()
+```
+- standard constructor, generates a new instance
+
+```rust
+let mut cpu = CPU::new();
+
+cpu.update();
+```
+- `update()` method updates usages and scheduler status
+
 ## Functions
 ```rust
 pub fn cpuUsage() -> CpuUsage
@@ -166,9 +190,9 @@ pub fn temperatureSensors() -> Vec<TemperatureSensor>
 - returns every temperature sensor in `TemperatureSensor` format
 
 ```rust
-pub fn cpuInfo() -> Cpu
+pub fn cpuInfo() -> CpuInfo
 ```
-- returns the cpu base information, enclosed in the `Cpu` data structure
+- returns the cpu base information, enclosed in the `CpuInfo` data structure
 
 ```rust
 pub fn ramSize() -> RamSize

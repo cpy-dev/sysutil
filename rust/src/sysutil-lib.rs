@@ -10,27 +10,6 @@ use std::thread;
 use std::time::Duration;
 use std::i64;
 
-fn readFile<T>(filePath: T) -> String
-where T: AsRef<Path>, {
-    match fs::File::open(filePath) {
-        Err(_) => {
-            return String::new();
-        }
-        Ok(mut file) => {
-            let mut buffer = String::new();
-
-            match file.read_to_string(&mut buffer) {
-                Err(_) => {
-                    return String::new();
-                }
-                Ok(_) => {
-                    return buffer.trim().to_string();
-                }
-            }
-        }
-    };
-}
-
 #[derive(Debug)]
 pub enum BatteryStatus {
     Charging,
@@ -48,6 +27,144 @@ impl Battery {
     fn new(capacity: u8, status: BatteryStatus) -> Battery {
         return Battery { capacity, status };
     }
+}
+
+#[derive(Debug)]
+pub struct CpuUsage {
+    pub average: ProcessorUsage,
+    pub processors: Vec<ProcessorUsage>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ProcessorUsage {
+    pub total: f32,
+    pub user: f32,
+    pub nice: f32,
+    pub system: f32,
+    pub idle: f32,
+    pub iowait: f32,
+    pub interrupt: f32,
+    pub soft_interrupt: f32,
+}
+
+impl ProcessorUsage {
+    fn clone(&self) -> ProcessorUsage {
+        return ProcessorUsage {
+            total: self.total,
+            user: self.user,
+            nice: self.nice,
+            system: self.system,
+            idle: self.idle,
+            iowait: self.iowait,
+            interrupt: self.interrupt,
+            soft_interrupt: self.soft_interrupt,
+        };
+    }
+}
+
+#[derive(Debug)]
+pub struct NetworkRate {
+    pub download: f32,
+    pub upload: f32,
+}
+
+#[derive(Debug)]
+pub struct TemperatureSensor {
+    pub label: String,
+    pub temperature: Option<f32>,
+}
+
+#[derive(Debug)]
+pub struct CpuInfo {
+    pub modelName: String,
+    pub cores: usize,
+    pub threads: usize,
+    pub dies: usize,
+    pub governors: Vec<String>,
+    pub maxFrequencyMHz: f32,
+    pub clockBoost: Option<bool>,
+    pub architecture: String,
+    pub byteOrder: String
+}
+
+#[derive(Debug)]
+pub struct CPU {
+    pub info: CpuInfo,
+    pub averageUsage: ProcessorUsage,
+    pub perProcessorUsage: Vec<ProcessorUsage>,
+    pub schedulerPolicies: Vec<SchedulerPolicy>
+}
+
+impl CPU {
+    fn new() -> CPU {
+        let cpuUsage = cpuUsage();
+
+        CPU {
+            info: cpuInfo(),
+            averageUsage: cpuUsage.average,
+            perProcessorUsage: cpuUsage.processors,
+            schedulerPolicies: schedulerInfo()
+        }
+    }
+
+    fn update(&mut self) {
+        self.schedulerPolicies = schedulerInfo();
+        let cpuUsage = cpuUsage();
+
+        self.averageUsage = cpuUsage.average;
+        self.perProcessorUsage = cpuUsage.processors;
+    }
+}
+
+#[derive(Debug)]
+pub struct RamSize {
+    pub gb: f32,
+    pub gib: f32,
+}
+
+#[derive(Debug)]
+pub struct SchedulerPolicy {
+    pub name: String,
+    pub scalingGovernor: String,
+    pub scalingDriver: String,
+    pub minimumScalingMHz: f32,
+    pub maximumScalingMHz: f32,
+}
+
+#[derive(Debug)]
+pub struct VramSize {
+    pub gb: f32,
+    pub gib: f32
+}
+
+#[derive(Debug, Clone)]
+pub enum RouteType {
+    TCP,
+    TCP6,
+    UDP,
+    UDP6
+}
+
+#[derive(Debug)]
+pub struct NetworkRoute {
+    pub routeType: RouteType,
+    pub localAddress: String,
+    pub localPort: u16,
+    pub remoteAddress: String,
+    pub remotePort: u16
+}
+
+fn readFile<T>(filePath: T) -> String
+where T: AsRef<Path>, {
+    if let Ok(mut file) = fs::File::open(filePath) {
+        let mut buffer = String::new();
+
+        if let Ok(_) = file.read_to_string(&mut buffer) {
+            return buffer.trim().to_string();
+        }
+    }
+
+    return String::new();
 }
 
 fn battery_path() -> Option<path::PathBuf> {
@@ -94,39 +211,6 @@ pub fn gpuUsage() -> Option<f32> {
     let fileContent = readFile("/sys/class/drm/card0/device/gpu_busy_percent");
     let gpuUsage = fileContent.parse::<f32>().ok()?;
     return Some(gpuUsage);
-}
-
-#[derive(Debug)]
-pub struct CpuUsage {
-    pub average: ProcessorUsage,
-    pub processors: Vec<ProcessorUsage>,
-}
-
-#[derive(Clone, Debug)]
-pub struct ProcessorUsage {
-    pub total: f32,
-    pub user: f32,
-    pub nice: f32,
-    pub system: f32,
-    pub idle: f32,
-    pub iowait: f32,
-    pub interrupt: f32,
-    pub soft_interrupt: f32,
-}
-
-impl ProcessorUsage {
-    fn clone(&self) -> ProcessorUsage {
-        return ProcessorUsage {
-            total: self.total,
-            user: self.user,
-            nice: self.nice,
-            system: self.system,
-            idle: self.idle,
-            iowait: self.iowait,
-            interrupt: self.interrupt,
-            soft_interrupt: self.soft_interrupt,
-        };
-    }
 }
 
 fn getStats() -> Vec<Vec<usize>> {
@@ -305,12 +389,6 @@ fn getRate() -> (usize, usize) {
     return (downloadRate, uploadRate);
 }
 
-#[derive(Debug)]
-pub struct NetworkRate {
-    pub download: f32,
-    pub upload: f32,
-}
-
 pub fn networkRate() -> NetworkRate {
     let (downBefore, upBefore) = getRate();
     thread::sleep(Duration::from_millis(500));
@@ -323,12 +401,6 @@ pub fn networkRate() -> NetworkRate {
         download: downloadRate,
         upload: uploadRate,
     };
-}
-
-#[derive(Debug)]
-pub struct TemperatureSensor {
-    pub label: String,
-    pub temperature: Option<f32>,
 }
 
 pub fn temperatureSensors() -> Vec<TemperatureSensor> {
@@ -354,20 +426,7 @@ pub fn temperatureSensors() -> Vec<TemperatureSensor> {
     return sensors;
 }
 
-#[derive(Debug)]
-pub struct Cpu {
-    pub modelName: String,
-    pub cores: usize,
-    pub threads: usize,
-    pub dies: usize,
-    pub governors: Vec<String>,
-    pub maxFrequencyMHz: f32,
-    pub clockBoost: Option<bool>,
-    pub architecture: String,
-    pub byteOrder: String
-}
-
-pub fn cpuInfo() -> Cpu {
+pub fn cpuInfo() -> CpuInfo {
     let infoFile = readFile("/proc/cpuinfo");
     let modelName = {
         let mut name = String::new();
@@ -496,7 +555,7 @@ pub fn cpuInfo() -> Cpu {
         }
     };
 
-    return Cpu {
+    return CpuInfo {
         modelName: modelName,
         cores: coreCount,
         threads: threadCount,
@@ -507,12 +566,6 @@ pub fn cpuInfo() -> Cpu {
         architecture: arch,
         byteOrder: byteOrder,
     };
-}
-
-#[derive(Debug)]
-pub struct RamSize {
-    pub gb: f32,
-    pub gib: f32,
 }
 
 pub fn ramSize() -> RamSize {
@@ -540,15 +593,6 @@ pub fn ramSize() -> RamSize {
     let GB = uMemTotal as f32 / 1000_f32 / 1000_f32;
 
     return RamSize { gb: GB, gib: GiB };
-}
-
-#[derive(Debug)]
-pub struct SchedulerPolicy {
-    pub name: String,
-    pub scalingGovernor: String,
-    pub scalingDriver: String,
-    pub minimumScalingMHz: f32,
-    pub maximumScalingMHz: f32,
 }
 
 pub fn schedulerInfo() -> Vec<SchedulerPolicy> {
@@ -586,12 +630,6 @@ pub fn schedulerInfo() -> Vec<SchedulerPolicy> {
     return policies;
 }
 
-#[derive(Debug)]
-pub struct VramSize {
-    pub gb: f32,
-    pub gib: f32
-}
-
 pub fn vramSize() -> Option<VramSize> {
     let fileContent = readFile("/sys/class/drm/card0/device/mem_info_vram_total");
     match fileContent.parse::<usize>() {
@@ -621,42 +659,35 @@ pub fn vramUsage() -> Option<f32> {
     return Some(uVramUsed as f32 * 100_f32 / uVramTotal as f32);
 }
 
-#[derive(Debug, Clone)]
-pub enum RouteType {
-    TCP,
-    TCP6,
-    UDP,
-    UDP6
-}
-
-#[derive(Debug)]
-pub struct NetworkRoute {
-    pub routeType: RouteType,
-    pub localAddress: String,
-    pub localPort: u16,
-    pub remoteAddress: String,
-    pub remotePort: u16
-}
-
 fn bytesToAddress(address: String, separator: &str) -> String {
     let mut chunks = Vec::<String>::new();
 
     let mut index: usize = 0;
     while index < address.len() {
         chunks.push(
-            String::from(i64::from_str_radix(&address[index..index+2], 16).unwrap().to_string())
+            String::from(
+                i64::from_str_radix(
+                    &address[index..index+2],
+                    16
+                ).unwrap().to_string()
+            )
         );
         index += 2;
     }
 
     chunks.reverse();
-
     return chunks.join(separator);
 }
 
 fn bytesToPort(port: String) -> u16 {
     let (LSB, MSB) = port.split_at(2);
-    ((i64::from_str_radix(MSB, 16).unwrap() as u16) << 8) + (i64::from_str_radix(LSB, 16).unwrap() as u16)
+    (
+        (
+            i64::from_str_radix(MSB, 16).unwrap() as u16
+        ) << 8
+    ) + (
+        i64::from_str_radix(LSB, 16).unwrap() as u16
+    )
 }
 
 fn getRoutes(file: String, separator: &str, routeType: RouteType) -> Vec<NetworkRoute> {
@@ -736,6 +767,9 @@ mod tests {
 
         println!("VRAM usage: {:?}", vramUsage());
         println!("{:?}", networkRoutes());
+
+        let mut cpu = CPU::new();
+        println!("{:?}", cpu);
 
         assert_eq!(String::new(), String::new());
     }

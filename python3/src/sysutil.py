@@ -40,7 +40,7 @@ class TemperatureSensor:
     temperature: float
 
 @dataclasses.dataclass
-class Cpu:
+class CpuInfo:
     modelName: str
     cores: int
     threads: int
@@ -52,17 +52,40 @@ class Cpu:
     byteOrder: str
 
 @dataclasses.dataclass
-class RamSize:
-    gb: float
-    gib: float
-
-@dataclasses.dataclass
 class SchedulerPolicy:
     name: str
     scalingGovernor: str
     scalingDriver: str
     minimumScalingMHz: float
     maximumScalingMHz: float
+
+@dataclasses.dataclass
+class CPU:
+    info: CpuInfo
+    averageUsage: ProcessorUsage
+    perProcessorUsage: [ProcessorUsage]
+    schedulerPolicies: [SchedulerPolicy]
+
+    def __init__(self):
+        self.info = cpuInfo()
+
+        usage = cpuUsage()
+        self.averageUsage = usage.average
+        self.perProcessorUsage = usage.processors
+
+        self.schedulerPolicies = schedulerInfo()
+
+
+    def update(self):
+        usage = cpuUsage()
+        self.averageUsage = usage.average
+        self.perProcessorUsage = usage.processors
+        self.schedulerPolicies = schedulerInfo()
+
+@dataclasses.dataclass
+class RamSize:
+    gb: float
+    gib: float
 
 @dataclasses.dataclass
 class VramSize:
@@ -380,10 +403,10 @@ def cpuInfo():
     maxFrequency /= 1000
     arch = ''
 
-    if sys.maxsize == 2 ** 64 - 1:
+    if sys.maxsize == 2 ** (64 - 1) - 1:
         arch = '64 bit'
 
-    elif sys.maxsize == 2 ** 32 - 1:
+    elif sys.maxsize == 2 ** (32 - 1) - 1:
         arch = '32 bit'
 
     byteOrder = ''
@@ -393,7 +416,7 @@ def cpuInfo():
     elif sys.byteorder == 'big':
         byteOrder = 'Big Endian'
 
-    return Cpu(
+    return CpuInfo(
         modelName=modelName,
         cores=coreCount,
         threads=threadCount,
@@ -588,3 +611,5 @@ if __name__ == '__main__':
 
     print('VRAM usage:', vramUsage())
     print(networkRoutes())
+
+    print(CPU())

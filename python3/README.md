@@ -29,9 +29,9 @@ class CpuUsage:
 ```
 - contains the average CPU usage, and the specific usage for each processor
 
-### Cpu
+### CpuInfo
 ```python3
-class Cpu:
+class CpuInfo:
     modelName: str
     cores: int
     threads: int
@@ -115,6 +115,29 @@ class NetworkRoute:
 ```
 - represents a network route
 
+### CPU
+```python3
+class CPU:
+    info: CpuInfo
+    averageUsage: ProcessorUsage
+    perProcessorUsage: [ProcessorUsage]
+    schedulerPolicies: [SchedulerPolicy]
+```
+- encloses all cpu data available in the library
+
+#### Methods
+```ptyhon3
+cpu = CPU()
+```
+- standard constructor
+
+```python3
+cpu = CPU()
+
+cpu.update()
+```
+- `update()` method updates usages and scheduler status
+
 ## Functions
 
 ## Functions
@@ -143,9 +166,9 @@ def temperatureSensors() -> [TemperatureSensor]
 - returns every temperature sensor in `TemperatureSensor` format
 
 ```python3
-def cpuInfo() -> Cpu
+def cpuInfo() -> CpuInfo
 ```
-- returns the cpu base information, enclosed in the `Cpu` data structure
+- returns the cpu base information, enclosed in the `CpuInfo` data structure
 
 ```python3
 def ramSize() -> RamSize
