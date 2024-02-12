@@ -1,5 +1,25 @@
-#![allow(non_snake_case)]
-#![allow(dead_code)]
+//! Linux system information library
+//!
+//! # Installation
+//!
+//! Include `sysutil` in your `Cargo.toml` as shown below:
+//! ```
+//! ...
+//!
+//! [dependencies]
+//! sysutil = "0.2.5";
+//! ```
+//! # Importation
+//! Add in your code:
+//! ```
+//! use sysutil;
+//! ```
+//!
+//! ---
+//! <div class="warning">GPU's related functions have been tested only on AMD Radeon 7000 series, any other GPU model is not "officially supported"</div>
+
+#[allow(non_snake_case)]
+#[allow(dead_code)]
 
 use std::fs;
 use std::io::Read;
@@ -10,6 +30,7 @@ use std::thread;
 use std::time::Duration;
 use std::i64;
 
+/// Represents the current status of battery
 #[derive(Debug)]
 pub enum BatteryStatus {
     Charging,
@@ -17,6 +38,7 @@ pub enum BatteryStatus {
     Full,
 }
 
+/// Contains capacity and current status of battery
 #[derive(Debug)]
 pub struct Battery {
     pub capacity: u8,
@@ -29,12 +51,14 @@ impl Battery {
     }
 }
 
+/// Contains the average CPU usage and the discrete usage for each processor
 #[derive(Debug)]
 pub struct CpuUsage {
     pub average: ProcessorUsage,
     pub processors: Vec<ProcessorUsage>,
 }
 
+/// Encloses the different parameters relative to processor usage
 #[derive(Clone, Debug)]
 pub struct ProcessorUsage {
     pub total: f32,
@@ -62,18 +86,21 @@ impl ProcessorUsage {
     }
 }
 
+/// Contains total download and upload newtwork rate (in bytes)
 #[derive(Debug)]
 pub struct NetworkRate {
     pub download: f32,
     pub upload: f32,
 }
 
+/// Contains temperature sensor's name and recorded temperature
 #[derive(Debug)]
 pub struct TemperatureSensor {
     pub label: String,
     pub temperature: Option<f32>,
 }
 
+/// Contains base information relative to the CPU
 #[derive(Debug)]
 pub struct CpuInfo {
     pub modelName: String,
@@ -87,6 +114,13 @@ pub struct CpuInfo {
     pub byteOrder: String
 }
 
+/// Encloses all CPU-related data available in the library
+/// ## Example
+/// Once generating a `CPU` instance, usages and scheduler policies can be updated by the `update()` method
+/// ```
+/// let cpu = CPU::new();
+/// cpu.update();
+/// ```
 #[derive(Debug)]
 pub struct CPU {
     pub info: CpuInfo,
@@ -96,7 +130,7 @@ pub struct CPU {
 }
 
 impl CPU {
-    fn new() -> CPU {
+    pub fn new() -> CPU {
         let cpuUsage = cpuUsage();
 
         CPU {
@@ -107,7 +141,7 @@ impl CPU {
         }
     }
 
-    fn update(&mut self) {
+    pub fn update(&mut self) {
         self.schedulerPolicies = schedulerInfo();
         let cpuUsage = cpuUsage();
 
@@ -116,12 +150,15 @@ impl CPU {
     }
 }
 
+
+/// Contains total ram size, both in GB (1000^3 bytes) and GiB (1024^3 bytes)
 #[derive(Debug)]
 pub struct RamSize {
     pub gb: f32,
     pub gib: f32,
 }
 
+/// Contains scheduler information relative to a processor in the system
 #[derive(Debug)]
 pub struct SchedulerPolicy {
     pub name: String,
@@ -131,12 +168,14 @@ pub struct SchedulerPolicy {
     pub maximumScalingMHz: f32,
 }
 
+/// Contains total gpu's vram size, both in GB (1000^3 bytes) and GiB (1024^3 bytes)
 #[derive(Debug)]
 pub struct VramSize {
     pub gb: f32,
     pub gib: f32
 }
 
+/// Different route types
 #[derive(Debug, Clone)]
 pub enum RouteType {
     TCP,
@@ -145,6 +184,7 @@ pub enum RouteType {
     UDP6
 }
 
+/// Represents a network route and its type, containing local address+port and remote address+port
 #[derive(Debug)]
 pub struct NetworkRoute {
     pub routeType: RouteType,
@@ -188,6 +228,7 @@ fn battery_path() -> Option<path::PathBuf> {
         .find_map(|handle| handle?.join().ok()?)
 }
 
+/// Returns battery current status and capacity as specified in `Battery` struct, returns `None` if it's not possible to retrieve data
 pub fn batteryInfo() -> Option<Battery> {
     let battery_path = battery_path()?;
     let capacity = readFile(battery_path.join("capacity"));
@@ -207,6 +248,7 @@ pub fn batteryInfo() -> Option<Battery> {
     Some(Battery::new(capacity.parse::<u8>().unwrap_or(0), status))
 }
 
+/// returns current GPU usage in percentage, returns `None` if it's not possible to retrieve data
 pub fn gpuUsage() -> Option<f32> {
     let fileContent = readFile("/sys/class/drm/card0/device/gpu_busy_percent");
     let gpuUsage = fileContent.parse::<f32>().ok()?;
@@ -241,6 +283,7 @@ fn getStats() -> Vec<Vec<usize>> {
     return uLines;
 }
 
+/// Returns CPU usage, both average and processor-wise, each value is in percentage
 pub fn cpuUsage() -> CpuUsage {
     let before = getStats();
     thread::sleep(Duration::from_millis(250));
@@ -304,6 +347,7 @@ pub fn cpuUsage() -> CpuUsage {
     };
 }
 
+/// Returns current CPU frequency in MHz, returns `None` if it's not possible to retrieve data
 pub fn cpuFrequency() -> Option<f32> {
     let fileContent = readFile("/proc/cpuinfo");
     let mut frequencies: f32 = 0.0;
@@ -323,6 +367,7 @@ pub fn cpuFrequency() -> Option<f32> {
     return None;
 }
 
+/// Returns current RAM usage in percentage
 pub fn ramUsage() -> f32 {
     let content = readFile("/proc/meminfo");
 
@@ -389,6 +434,7 @@ fn getRate() -> (usize, usize) {
     return (downloadRate, uploadRate);
 }
 
+/// Returns current network rate (downlaod and upload), expressed in bytes
 pub fn networkRate() -> NetworkRate {
     let (downBefore, upBefore) = getRate();
     thread::sleep(Duration::from_millis(500));
@@ -403,6 +449,7 @@ pub fn networkRate() -> NetworkRate {
     };
 }
 
+/// Returns every temperature sensor in the system, using the `TemperatureSensor` struct
 pub fn temperatureSensors() -> Vec<TemperatureSensor> {
     let hwmonPath = Path::new("/sys/class/hwmon");
     let dirs = fs::read_dir(hwmonPath).unwrap();
@@ -426,6 +473,7 @@ pub fn temperatureSensors() -> Vec<TemperatureSensor> {
     return sensors;
 }
 
+/// Returns CPU base information, enclosed in the `CpuInfo` data structure
 pub fn cpuInfo() -> CpuInfo {
     let infoFile = readFile("/proc/cpuinfo");
     let modelName = {
@@ -568,6 +616,7 @@ pub fn cpuInfo() -> CpuInfo {
     };
 }
 
+/// Returns RAM size using the `RamSize` data structure
 pub fn ramSize() -> RamSize {
     let content = readFile("/proc/meminfo");
 
@@ -595,6 +644,7 @@ pub fn ramSize() -> RamSize {
     return RamSize { gb: GB, gib: GiB };
 }
 
+/// Returns scheduler information for each processor
 pub fn schedulerInfo() -> Vec<SchedulerPolicy> {
     let schedulerDir = path::Path::new("/sys/devices/system/cpu/cpufreq/");
     let mut policies = Vec::<SchedulerPolicy>::new();
@@ -630,6 +680,7 @@ pub fn schedulerInfo() -> Vec<SchedulerPolicy> {
     return policies;
 }
 
+/// Returns gpu's vram size as specified in `VramSize` struct, returns `None` if it's not possible to retrieve data
 pub fn vramSize() -> Option<VramSize> {
     let fileContent = readFile("/sys/class/drm/card0/device/mem_info_vram_total");
     match fileContent.parse::<usize>() {
@@ -645,6 +696,7 @@ pub fn vramSize() -> Option<VramSize> {
     };
 }
 
+/// Returns gpu's vram usage in percentage, returns `None` if it's not possible to retrieve data
 pub fn vramUsage() -> Option<f32> {
     let vramTotal = readFile("/sys/class/drm/card0/device/mem_info_vram_total");
     let vramUsed = readFile("/sys/class/drm/card0/device/mem_info_vram_used");
@@ -722,6 +774,7 @@ fn getRoutes(file: String, separator: &str, routeType: RouteType) -> Vec<Network
     return routes;
 }
 
+/// Returns a list of each internal network route
 pub fn networkRoutes() -> Vec<NetworkRoute> {
     let mut routes: Vec<NetworkRoute> = Vec::<NetworkRoute>::new();
 

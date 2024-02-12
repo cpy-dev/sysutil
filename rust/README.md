@@ -138,7 +138,7 @@ pub struct NetworkRoute {
     remotePort: u16
 }
 ```
-- represents a network route and its type
+-  represents a network route and its type, containing local address+port and remote address+port
 
 ### CPU
 ```rust
