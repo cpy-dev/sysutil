@@ -106,6 +106,44 @@ class NetworkRoute:
     remoteAddress: str
     remotePort: int
 
+@dataclasses.dataclass
+class ClockSource:
+    current: str
+    available: [str]
+
+@dataclasses.dataclass
+class Bios:
+    vendor: str
+    release: str
+    version: str
+    date: str
+
+@dataclasses.dataclass
+class Motherboard:
+    name: str
+    vendor: str
+    version: str
+    bios: Bios
+
+@dataclasses.dataclass
+class GpuMetrics:
+    temperatureEdge: int
+    temperatureHotspot: int
+    temperatureMem: int
+    temperatureVrgfx: int
+    temperatureVrsoc: int
+    temperatureVrmem: int
+    averageSocketPower: int
+    averageGfxclkFrequency: int
+    averageSockclkFrequency: int
+    averageUclkFrequency: int
+    currentGfxclk: int
+    currentSockclk: int
+    throttleStatus: int
+    currentFanSpeed: int
+    pcieLinkWidth: int
+    pcieLinkSpeed: int
+
 def __batteryPath():
     DRIVER_DIR = '/sys/class/power_supply'
     batteries = []
@@ -593,6 +631,138 @@ def networkRoutes():
 
     return routes
 
+def clockSource():
+    currentClockSource = ''
+    try:
+        with open('/sys/devices/system/clocksource/clocksource0/current_clocksource', 'r') as file:
+            currentClockSource = file.read().strip()
+    except:
+        pass
+
+    availableClockSources = []
+    try:
+        with open('/sys/devices/system/clocksource/clocksource0/available_clocksource', 'r') as file:
+            availableClockSources = file.read().strip().split(' ')
+    except:
+        pass
+
+    return ClockSource(
+        current=currentClockSource,
+        available=availableClockSources
+    )
+
+def biosInfo():
+    vendor = ''
+    try:
+        with open('/sys/devices/virtual/dmi/id/bios_vendor', 'r') as file:
+            vendor = file.read().strip()
+    except:
+        pass
+
+    release = ''
+    try:
+        with open('/sys/devices/virtual/dmi/id/bios_release', 'r') as file:
+            release = file.read().strip()
+    except:
+        pass
+
+    version = ''
+    try:
+        with open('/sys/devices/virtual/dmi/id/bios_version', 'r') as file:
+            version = file.read().strip()
+    except:
+        pass
+
+    date = ''
+    try:
+        with open('/sys/devices/virtual/dmi/id/bios_date', 'r') as file:
+            date = file.read().strip()
+    except:
+        pass
+
+    return Bios(
+        vendor=vendor,
+        version=version,
+        release=release,
+        date=date
+    )
+
+def motherboardInfo():
+    name = ''
+    try:
+        with open('/sys/devices/virtual/dmi/id/board_name', 'r') as file:
+            name = file.read().strip()
+    except:
+        pass
+
+    vendor = ''
+    try:
+        with open('/sys/devices/virtual/dmi/id/board_vendor', 'r') as file:
+            vendor = file.read().strip()
+    except:
+        pass
+
+    version = ''
+    try:
+        with open('/sys/devices/virtual/dmi/id/board_version', 'r') as file:
+            version = file.read().strip()
+    except:
+        pass
+
+    bios = biosInfo()
+    return Motherboard (
+        name=name,
+        version=version,
+        vendor=vendor,
+        bios=bios
+    )
+
+def __bytesToInt(bytes):
+    res = 0
+    shift = 8 * len(bytes)
+
+    if sys.byteorder == 'little':
+        bytes = bytes[::-1]
+
+    for byte in bytes:
+        shift -= 8
+        res += byte << shift
+
+    return res
+
+def gpuMetrics():
+    try:
+        with open('/sys/class/drm/card0/device/gpu_metrics', 'rb') as file:
+            bytes = file.read()
+
+    except:
+        pass
+
+    if bytes[2] != 1:
+        return None
+
+    content = bytes[3]
+    bytes = bytes[4:]
+
+    return GpuMetrics (
+        temperatureEdge=__bytesToInt(bytes[0:2] if content else bytes[8:10]),
+        temperatureHotspot=__bytesToInt(bytes[2:4] if content else bytes[10:12]),
+        temperatureMem=__bytesToInt(bytes[4:6] if content else bytes[12:14]),
+        temperatureVrgfx=__bytesToInt(bytes[6:8] if content else bytes[14:16]),
+        temperatureVrsoc=__bytesToInt(bytes[8:10] if content else bytes[16:18]),
+        temperatureVrmem=__bytesToInt(bytes[10:12] if content else bytes[18:20]),
+        averageSocketPower=__bytesToInt(bytes[18:20] if content else bytes[26:28]),
+        averageGfxclkFrequency=__bytesToInt(bytes[36:38]),
+        averageSockclkFrequency=__bytesToInt(bytes[38:40]),
+        averageUclkFrequency=__bytesToInt(bytes[40:42]),
+        currentGfxclk=__bytesToInt(bytes[50:52]),
+        currentSockclk=__bytesToInt(bytes[52:54]),
+        throttleStatus=__bytesToInt(bytes[64:68]),
+        currentFanSpeed=__bytesToInt(bytes[68:70]),
+        pcieLinkWidth=__bytesToInt(bytes[70:72]),
+        pcieLinkSpeed=__bytesToInt(bytes[72:74]),
+    )
+
 if __name__ == '__main__':
     print(cpuUsage())
     print(f'RAM usage:', ramUsage())
@@ -613,3 +783,7 @@ if __name__ == '__main__':
     print(networkRoutes())
 
     print(CPU())
+
+    print(clockSource())
+    print(motherboardInfo())
+    print(gpuMetrics())

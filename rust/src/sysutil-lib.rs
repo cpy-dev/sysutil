@@ -7,7 +7,7 @@
 //! ...
 //!
 //! [dependencies]
-//! sysutil = "0.2.5";
+//! sysutil = "0.2.6";
 //! ```
 //! # Importation
 //! Add in your code:
@@ -18,8 +18,9 @@
 //! ---
 //! <div class="warning">GPU's related functions have been tested only on AMD Radeon 7000 series, any other GPU model is not "officially supported"</div>
 
-#[allow(non_snake_case)]
-#[allow(dead_code)]
+#![allow(non_snake_case)]
+#![allow(dead_code)]
+#![allow(non_camel_case_types)]
 
 use std::fs;
 use std::io::Read;
@@ -150,7 +151,6 @@ impl CPU {
     }
 }
 
-
 /// Contains total ram size, both in GB (1000^3 bytes) and GiB (1024^3 bytes)
 #[derive(Debug)]
 pub struct RamSize {
@@ -192,6 +192,52 @@ pub struct NetworkRoute {
     pub localPort: u16,
     pub remoteAddress: String,
     pub remotePort: u16
+}
+
+/// Contains currently active clock source and the available ones
+#[derive(Debug)]
+pub struct ClockSource {
+    pub current: String,
+    pub available: Vec<String>
+}
+
+/// Contains information relative to the motherboard and the installed bios
+#[derive(Debug)]
+pub struct Motherboard {
+    pub name: String,
+    pub vendor: String,
+    pub version: String,
+    pub bios: Bios
+}
+
+/// Contains information relative to the installed bios
+#[derive(Debug)]
+pub struct Bios {
+    pub vendor: String,
+    pub release: String,
+    pub version: String,
+    pub date: String
+}
+
+/// Encloses gpu metrics parameters
+#[derive(Debug)]
+pub struct GpuMetrics {
+    pub temperatureEdge: u16,
+    pub temperatureHotspot: u16,
+    pub temperatureMem: u16,
+    pub temperatureVrgfx: u16,
+    pub temperatureVrsoc: u16,
+    pub temperatureVrmem: u16,
+    pub averageSocketPower: u16,
+    pub averageGfxclkFrequency: u16,
+    pub averageSockclkFrequency: u16,
+    pub averageUclkFrequency: u16,
+    pub currentGfxclk: u16,
+    pub currentSockclk: u16,
+    pub throttleStatus: u32,
+    pub currentFanSpeed: u16,
+    pub pcieLinkWidth: u16,
+    pub pcieLinkSpeed: u16,
 }
 
 fn readFile<T>(filePath: T) -> String
@@ -797,6 +843,176 @@ pub fn networkRoutes() -> Vec<NetworkRoute> {
     return routes;
 }
 
+/// Returns the currently active clock source and the different ones available, enclosed in `ClockSource` struct
+pub fn clockSource() -> ClockSource {
+    let currentClockSource = readFile(
+        "/sys/devices/system/clocksource/clocksource0/current_clocksource"
+    );
+
+    let availableClockSources = readFile(
+        "/sys/devices/system/clocksource/clocksource0/available_clocksource"
+    );
+
+    let mut sources = Vec::<String>::new();
+    for source in availableClockSources.split(" ") {
+        sources.push(String::from(source));
+    }
+
+    ClockSource {
+        current: currentClockSource,
+        available: sources,
+    }
+}
+
+/// Returns information about the currently installed BIOS
+pub fn biosInfo() -> Bios {
+    let vendor = String::from(readFile("/sys/devices/virtual/dmi/id/bios_vendor").trim());
+    let release = String::from(readFile("/sys/devices/virtual/dmi/id/bios_release").trim());
+
+    let version = String::from(readFile("/sys/devices/virtual/dmi/id/bios_version").trim());
+    let date = String::from(readFile("/sys/devices/virtual/dmi/id/bios_date").trim());
+
+    Bios {
+        vendor: vendor,
+        release: release,
+        version: version,
+        date: date
+    }
+}
+
+/// Returns information about the motherboard
+pub fn motherboardInfo() -> Motherboard {
+    let name = String::from(readFile("/sys/devices/virtual/dmi/id/board_name").trim());
+    let vendor = String::from(readFile("/sys/devices/virtual/dmi/id/board_vendor").trim());
+
+    let version = String::from(readFile("/sys/devices/virtual/dmi/id/board_version").trim());
+    let bios = biosInfo();
+
+    Motherboard {
+        name: name,
+        version: version,
+        vendor: vendor,
+        bios: bios
+    }
+}
+
+fn bytesToU16(bytes: Vec<u8>) -> u16 {
+    let first = bytes[1];
+    let second = bytes[0];
+
+    let mut tmp = first as u16;
+    for _ in 0..8 {
+        tmp = tmp * 2;
+    }
+
+    tmp + (second as u16)
+}
+
+fn bytesToU32(bytes: Vec<u8>) -> u32 {
+    let first = bytes[3];
+    let second = bytes[2];
+    let third = bytes[1];
+    let fourth = bytes[0];
+
+    ((first as u32) << 24) + ((second as u32) << 16) + ((third as u32) << 8) + (fourth as u32)
+}
+
+fn bytesToU64(bytes: Vec<u8>) -> u64 {
+    let mut res: u64 = 0;
+    let mut shift: u64 = 64;
+
+    let mut reversed = bytes.clone();
+    reversed.reverse();
+
+    for byte in reversed {
+        shift -= 8;
+        res += (byte as u64) << shift;
+    }
+
+    return res;
+}
+
+/// Returns metrics parameters from the amdgpu driver
+pub fn gpuMetrics() -> Option<GpuMetrics> {
+    let filePipe = fs::read(path::Path::new("/sys/class/drm/card0/device/gpu_metrics"));
+
+    let mut bytes: Vec<u8> = Vec::<u8>::new();
+    let mut error = false;
+
+    match filePipe {
+        Err(_) => {
+            error = true;
+        },
+        Ok(bytesPipe) => {
+            bytes = bytesPipe;
+        }
+    };
+
+    if error {
+        return None;
+    }
+
+    let format = bytes[2];
+    let content = bytes[3];
+
+    bytes = bytes[4..].to_vec();
+
+    if format != 1 {
+        return None;
+    }
+
+    Some(
+        GpuMetrics {
+            temperatureEdge: match content {
+                0 => bytesToU16(bytes[8..10].to_vec()),
+                _ => bytesToU16(bytes[0..2].to_vec())
+            },
+
+            temperatureHotspot: match content {
+                0 => bytesToU16(bytes[10..12].to_vec()),
+                _ => bytesToU16(bytes[2..4].to_vec())
+            },
+
+            temperatureMem: match content {
+                0 => bytesToU16(bytes[12..14].to_vec()),
+                _ => bytesToU16(bytes[4..6].to_vec())
+            },
+
+            temperatureVrgfx: match content {
+                0 => bytesToU16(bytes[14..16].to_vec()),
+                _ => bytesToU16(bytes[6..8].to_vec())
+            },
+
+            temperatureVrsoc: match content {
+                0 => bytesToU16(bytes[16..18].to_vec()),
+                _ => bytesToU16(bytes[8..10].to_vec())
+            },
+
+            temperatureVrmem: match content {
+                0 => bytesToU16(bytes[18..20].to_vec()),
+                _ => bytesToU16(bytes[10..12].to_vec())
+            },
+
+            averageSocketPower: match content {
+                0 => bytesToU16(bytes[26..28].to_vec()),
+                _ => bytesToU16(bytes[18..20].to_vec())
+            },
+
+            averageGfxclkFrequency: bytesToU16(bytes[36..38].to_vec()),
+            averageSockclkFrequency: bytesToU16(bytes[38..40].to_vec()),
+            averageUclkFrequency: bytesToU16(bytes[40..42].to_vec()),
+
+            currentGfxclk: bytesToU16(bytes[50..52].to_vec()),
+            currentSockclk: bytesToU16(bytes[52..54].to_vec()),
+
+            throttleStatus: bytesToU32(bytes[64..68].to_vec()),
+            currentFanSpeed: bytesToU16(bytes[68..70].to_vec()),
+            pcieLinkWidth: bytesToU16(bytes[70..72].to_vec()),
+            pcieLinkSpeed: bytesToU16(bytes[72..74].to_vec())
+        }
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -821,8 +1037,13 @@ mod tests {
         println!("VRAM usage: {:?}", vramUsage());
         println!("{:?}", networkRoutes());
 
-        let mut cpu = CPU::new();
+        let cpu = CPU::new();
         println!("{:?}", cpu);
+
+        println!("{:?}", clockSource());
+        println!("{:?}", motherboardInfo());
+
+        println!("{:?}", gpuMetrics());
 
         assert_eq!(String::new(), String::new());
     }

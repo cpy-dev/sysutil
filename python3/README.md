@@ -138,7 +138,55 @@ cpu.update()
 ```
 - `update()` method updates usages and scheduler status
 
-## Functions
+### Clocksource
+```python
+class ClockSource:
+    current: str
+    available: [str]
+```
+- contains current clock source and the available ones
+
+### Bios
+```python
+class Bios:
+    vendor: str
+    release: str
+    version: str
+    date: str
+```
+- contains information relative to the installed bios
+
+### Motherboard
+```python
+class Motherboard:
+    name: str
+    vendor: str
+    version: str
+    bios: Bios
+```
+- contains information relative to the motherboard and the installed bios
+
+### GpuMetrics
+```python
+class GpuMetrics:
+    temperatureEdge: int
+    temperatureHotspot: int
+    temperatureMem: int
+    temperatureVrgfx: int
+    temperatureVrsoc: int
+    temperatureVrmem: int
+    averageSocketPower: int
+    averageGfxclkFrequency: int
+    averageSockclkFrequency: int
+    averageUclkFrequency: int
+    currentGfxclk: int
+    currentSockclk: int
+    throttleStatus: int
+    currentFanSpeed: int
+    pcieLinkWidth: int
+    pcieLinkSpeed: int
+```
+- encloses gpu metrics parameters
 
 ## Functions
 ```python3
@@ -205,3 +253,23 @@ def vramUsage() -> float
 def networkRoutes() -> [NetworkRoute]
 ```
 - returns a list containing each internal network route
+
+```python
+def clockSource() -> ClockSource
+```
+- returns the currently active clock source and the different ones available, enclosed in `ClockSource` struct
+
+```python
+def biosInfo() -> Bios
+```
+- returns information about the currently installed BIOS
+
+```python
+def motherboardInfo() -> Motherboard
+```
+- returns information about the motherboard
+
+```python
+def gpuMetrics() -> GpuMetrics
+```
+- returns metrics parameters from the amdgpu driver

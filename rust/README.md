@@ -143,10 +143,10 @@ pub struct NetworkRoute {
 ### CPU
 ```rust
 pub struct CPU {
-    pub info: CpuInfo,
-    pub averageUsage: ProcessorUsage,
-    pub perProcessorUsage: Vec<ProcessorUsage>,
-    pub schedulerPolicies: Vec<SchedulerPolicy>
+    info: CpuInfo,
+    averageUsage: ProcessorUsage,
+    perProcessorUsage: Vec<ProcessorUsage>,
+    schedulerPolicies: Vec<SchedulerPolicy>
 }
 ```
 - encloses all cpu data available in the library
@@ -163,6 +163,60 @@ let mut cpu = CPU::new();
 cpu.update();
 ```
 - `update()` method updates usages and scheduler status
+
+## Clocksource
+```rust
+pub struct ClockSource {
+    pub current: String,
+    pub available: Vec<String>
+}
+```
+- contains current clock source and the available ones
+
+### Bios
+```rust
+pub struct Bios {
+    vendor: String,
+    release: String,
+    version: String,
+    date: String
+}
+```
+- contains information relative to the installed bios
+
+### Motherboard
+```rust
+pub struct Motherboard {
+    name: String,
+    vendor: String,
+    version: String,
+    bios: Bios
+}
+```
+- contains information relative to the motherboard and the installed bios
+
+### GpuMetrics
+```rust
+pub struct GpuMetrics {
+    temperatureEdge: u16, 
+    temperatureHotspot: u16,
+    temperatureMem: u16, 
+    temperatureVrgfx: u16,
+    temperatureVrsoc: u16,
+    temperatureVrmem: u16,
+    averageSocketPower: u16,
+    averageGfxclkFrequency: u16,
+    averageSockclkFrequency: u16,
+    averageUclkFrequency: u16,
+    currentGfxclk: u16,
+    currentSockclk: u16,
+    throttleStatus: u32,
+    currentFanSpeed: u16,
+    pcieLinkWidth: u16,
+    pcieLinkSpeed: u16,
+}
+```
+ - encloses gpu metrics parameters
 
 ## Functions
 ```rust
@@ -229,3 +283,23 @@ pub fn vramUsage() -> Option<f32>
 pub fn networkRoutes() -> Vec<Route>
 ```
 - returns a list containing each internal network route
+
+```rust
+pub fn clockSource() -> ClockSource
+```
+- returns the currently active clock source and the different ones available, enclosed in `ClockSource` struct
+
+```rust
+pub fn biosInfo() -> Bios
+```
+- returns information about the currently installed BIOS
+
+```rust
+pub fn motherboardInfo() -> Motherboard
+```
+- returns information about the motherboard
+
+```rust
+pub fn gpuMetrics() -> Option<GpuMetrics>
+```
+- returns metrics parameters from the amdgpu driver
