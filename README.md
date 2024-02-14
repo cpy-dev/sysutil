@@ -2,8 +2,13 @@
 - Linux system information library
 - available for both Rust and Python
 
+---
+#### [crates.io](https://crates.io/crates/sysutil)
+#### [pypi.org](https://pypi.org/project/sysutil-lib/)
+
+---
 ## Contribution
-- feel free to contribute and / or translate the library in other languages
+- feel free to contribute adding features and / or translate the library in other languages
 
 ## Rust
 ### [Rust Documentation](https://github.com/ryzeon-dev/sysutil/blob/master/rust/README.md)
