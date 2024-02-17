@@ -218,6 +218,48 @@ pub struct GpuMetrics {
 ```
  - encloses gpu metrics parameters
 
+### NvmeDevice
+```rust
+pub struct NvmeDevice {
+    device: String,
+    pcieAddress: String,
+    model: String,
+    linkSpeedGTs: f32,
+    pcieLanes: usize,
+    size: ByteSize
+}
+```
+- Contains NVME device information
+
+### ByteSize
+```rust
+pub struct ByteSize {
+    bytes: usize
+}
+```
+- Bytes size data structure implementing methods to convert in various size orders
+
+### StoragePartition
+```rust
+pub struct StoragePartition {
+    device: String,
+    size: ByteSize,
+    startPoint: usize
+}
+```
+- Encloses device name, size and startpoint relative to a partition
+
+### StorageDevice
+```rust
+pub struct StorageDevice {
+    model: String,
+    device: String,
+    size: ByteSize,
+    partitions: Vec<StoragePartition>
+}
+```
+- Contains information relative to a storage device in the system
+
 ## Functions
 ```rust
 pub fn cpuUsage() -> CpuUsage
@@ -303,3 +345,13 @@ pub fn motherboardInfo() -> Motherboard
 pub fn gpuMetrics() -> Option<GpuMetrics>
 ```
 - returns metrics parameters from the amdgpu driver
+
+```rust
+pub fn nvmeDevices() -> Vec<NvmeDevice>
+```
+- Returns a vector containing all NVME devices found in the system
+
+```rust
+pub fn storageDevices() -> Vec<StorageDevice>
+```
+- Returns a vector containing all storage devices (NVME excluded) in the system

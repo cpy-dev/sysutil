@@ -188,6 +188,44 @@ class GpuMetrics:
 ```
 - encloses gpu metrics parameters
 
+### Bytesize
+```python
+class ByteSize:
+    __bytes: int
+```
+- Bytes size data structure implementing methods to convert in various size orders
+
+### NvmeDevice
+```python
+class NvmeDevice:
+    device: str
+    pcieAddress: str
+    model: str
+    linkSpeedGTs: float
+    pcieLanes: int
+    size: ByteSize
+```
+- Contains NVME device information
+
+### StoragePartition
+```python
+class StoragePartition:
+    device: str
+    size: ByteSize
+    startPoint: str
+```
+- Encloses device name, size and startpoint relative to a partition
+
+### StorageDevice
+```python
+class StorageDevice:
+    model: str
+    device: str
+    size: ByteSize
+    partitions: [StoragePartition]
+```
+- Contains information relative to a storage device in the system
+
 ## Functions
 ```python3
 def cpuUsage() -> CpuUsage
@@ -273,3 +311,13 @@ def motherboardInfo() -> Motherboard
 def gpuMetrics() -> GpuMetrics
 ```
 - returns metrics parameters from the amdgpu driver
+
+```python
+def nvmeDevices() -> [NvmeDevices]
+```
+- Returns a vector containing all NVME devices found in the system
+
+```python
+def storageDevices() -> [StorageDevices]
+```
+- Returns a vector containing all storage devices (NVME excluded) in the system

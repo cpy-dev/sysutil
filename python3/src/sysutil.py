@@ -144,6 +144,67 @@ class GpuMetrics:
     pcieLinkWidth: int
     pcieLinkSpeed: int
 
+@dataclasses.dataclass
+class ByteSize:
+    __bytes: int
+
+    def b(self):
+        return self.__bytes
+
+    def kb(self):
+        return self.__bytes / 1000
+
+    def mb(self):
+        return self.__bytes / 1000 / 1000
+
+    def gb(self):
+        return self.__bytes / 1000 / 1000 / 1000
+
+    def tb(self):
+        return self.__bytes / 1000 / 1000 / 1000 / 1000
+
+    def kib(self):
+        return self.__bytes / 1024
+
+    def mib(self):
+        return self.__bytes / 1024 / 1024
+
+    def gib(self):
+        return self.__bytes / 1024 / 1024 / 1024
+
+    def tib(self):
+        return self.__bytes / 1024 / 1024 / 1024 / 1024
+
+@dataclasses.dataclass
+class NvmeDevice:
+    device: str
+    pcieAddress: str
+    model: str
+    linkSpeedGTs: float
+    pcieLanes: int
+    size: ByteSize
+
+@dataclasses.dataclass
+class StoragePartition:
+    device: str
+    size: ByteSize
+    startPoint: str
+
+@dataclasses.dataclass
+class StorageDevice:
+    model: str
+    device: str
+    size: ByteSize
+    partitions: [StoragePartition]
+
+def __readFile(filePath):
+    try:
+        with open(filePath, 'r') as file:
+            return file.read()
+
+    except:
+        return ''
+
 def __batteryPath():
     DRIVER_DIR = '/sys/class/power_supply'
     batteries = []
@@ -763,6 +824,101 @@ def gpuMetrics():
         pcieLinkSpeed=__bytesToInt(bytes[72:74]),
     )
 
+def nvmeDevices():
+    baseDir = '/sys/class/nvme'
+
+    try:
+        dirContent = os.listdir(baseDir)
+    except:
+        return []
+
+    devices = []
+    partitions = __readFile('/proc/partitions')
+
+    for device in dirContent:
+        address = __readFile(f'{baseDir}/{device}/address').strip()
+        model = __readFile(f'{baseDir}/{device}/model').strip()
+
+        linkSpeed = __readFile(f'{baseDir}/{device}/device/current_link_speed').strip()
+        linkSpeed = float(linkSpeed.split(' ')[0])
+
+        pcieLanes = __readFile(f'{baseDir}/{device}/device/current_link_width').strip()
+        pcieLanes = int(pcieLanes)
+
+        size = 0
+        for partitionLine in partitions.strip().split('\n')[2:]:
+            if device in partitionLine:
+                size = int(partitionLine.split(' ')[-2])
+
+        devices.append(NvmeDevice(
+            device=device,
+            model=model,
+            pcieAddress=address,
+            linkSpeedGTs=linkSpeed,
+            pcieLanes=pcieLanes,
+            size=ByteSize(size)
+        ))
+
+    return devices
+
+def storageDevices():
+    baseDir = '/sys/class/block'
+
+    try:
+        dirContent = os.listdir(baseDir)
+    except:
+        return []
+
+    devices = []
+    for dir in dirContent:
+        if 'sd' not in dir or len(dir) != 3:
+            continue
+
+        device = f'/dev/{dir}'
+        size = __readFile(f'{baseDir}/{dir}/size').strip()
+
+        try:
+            size = ByteSize(int(size))
+
+        except:
+            size = ByteSize(0)
+
+        model = __readFile(f'{baseDir}/{dir}/device/model').strip()
+        partitions = []
+
+        for partitionDir in dirContent:
+            if dir not in partitionDir:
+                continue
+
+            if len(partitionDir) <= 3:
+                continue
+            
+            partitionSize = __readFile(f'{baseDir}/{partitionDir}/size').strip()
+            partitionSize = ByteSize(int(partitionSize) if partitionSize else 0)
+            
+            startByte = __readFile(f'{baseDir}/{partitionDir}/start').strip()
+            startByte = ByteSize(int(startByte) if startByte else 0)
+
+            partitions.append(
+                StoragePartition(
+                    device=f'/dev/{partitionDir}',
+                    size=partitionSize,
+                    startPoint=startByte
+                )
+            )
+
+        devices.append(
+            StorageDevice (
+                model=model,
+                device=device,
+                size=size,
+                partitions=partitions
+            )
+        )
+
+    return devices
+
+
 if __name__ == '__main__':
     print(cpuUsage())
     print(f'RAM usage:', ramUsage())
@@ -786,4 +942,7 @@ if __name__ == '__main__':
 
     print(clockSource())
     print(motherboardInfo())
+
     print(gpuMetrics())
+    print(storageDevices())
+    print(nvmeDevices())

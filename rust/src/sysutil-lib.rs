@@ -1,13 +1,12 @@
 //! Linux system information library
-//!
 //! # Installation
 //!
 //! Include `sysutil` in your `Cargo.toml` as shown below:
-//! ```
+//! ```toml
 //! ...
 //!
 //! [dependencies]
-//! sysutil = "0.2.6";
+//! sysutil = "0.2.7";
 //! ```
 //! # Importation
 //! Add in your code:
@@ -25,7 +24,6 @@
 use std::fs;
 use std::io::Read;
 use std::path;
-use std::path::Path;
 use std::process::Command;
 use std::thread;
 use std::time::Duration;
@@ -118,7 +116,7 @@ pub struct CpuInfo {
 /// Encloses all CPU-related data available in the library
 /// ## Example
 /// Once generating a `CPU` instance, usages and scheduler policies can be updated by the `update()` method
-/// ```
+/// ```rust
 /// let cpu = CPU::new();
 /// cpu.update();
 /// ```
@@ -240,8 +238,86 @@ pub struct GpuMetrics {
     pub pcieLinkSpeed: u16,
 }
 
+/// Contains NVME device information
+#[derive(Debug)]
+pub struct NvmeDevice {
+    pub device: String,
+    pub pcieAddress: String,
+    pub model: String,
+    pub linkSpeedGTs: f32,
+    pub pcieLanes: usize,
+    pub size: ByteSize
+}
+
+/// Bytes size data structure implementing methods to convert in various size orders
+#[derive(Debug)]
+pub struct ByteSize {
+    bytes: usize
+}
+
+impl ByteSize {
+    fn new(value: usize) -> ByteSize {
+        return ByteSize {
+            bytes: value
+        }
+    }
+
+    pub fn b(&self) -> usize {
+        self.bytes
+    }
+
+    pub fn kb(&self) -> f32 {
+        self.bytes as f32 / 1000_f32
+    }
+
+    pub fn mb(&self) -> f32 {
+        self.bytes as f32 / 1000_f32 / 1000_f32
+    }
+
+    pub fn gb(&self) -> f32 {
+        self.bytes as f32 / 1000_f32 / 1000_f32 / 1000_f32
+    }
+
+    pub fn tb(&self) -> f32 {
+        self.bytes as f32 / 1000_f32 / 1000_f32 / 1000_f32 / 1000_f32
+    }
+
+    pub fn kib(&self) -> f32 {
+        self.bytes as f32 / 1024_f32
+    }
+
+    pub fn mib(&self) -> f32 {
+        self.bytes as f32 / 1024_f32 / 1024_f32
+    }
+
+    pub fn gib(&self) -> f32 {
+        self.bytes as f32 / 1024_f32 / 1024_f32 / 1024_f32
+    }
+
+    pub fn tib(&self) -> f32 {
+        self.bytes as f32 / 1024_f32 / 1024_f32 / 1024_f32 / 1024_f32
+    }
+}
+
+/// Encloses device name, size and startpoint relative to a partition
+#[derive(Debug)]
+pub struct StoragePartition {
+    pub device: String,
+    pub size: ByteSize,
+    pub startPoint: usize
+}
+
+/// Contains information relative to a storage device in the system
+#[derive(Debug)]
+pub struct StorageDevice {
+    pub model: String,
+    pub device: String,
+    pub size: ByteSize,
+    pub partitions: Vec<StoragePartition>
+}
+
 fn readFile<T>(filePath: T) -> String
-where T: AsRef<Path>, {
+where T: AsRef<path::Path>, {
     if let Ok(mut file) = fs::File::open(filePath) {
         let mut buffer = String::new();
 
@@ -497,7 +573,7 @@ pub fn networkRate() -> NetworkRate {
 
 /// Returns every temperature sensor in the system, using the `TemperatureSensor` struct
 pub fn temperatureSensors() -> Vec<TemperatureSensor> {
-    let hwmonPath = Path::new("/sys/class/hwmon");
+    let hwmonPath = path::Path::new("/sys/class/hwmon");
     let dirs = fs::read_dir(hwmonPath).unwrap();
 
     let mut sensors = Vec::<TemperatureSensor>::new();
@@ -533,7 +609,7 @@ pub fn cpuInfo() -> CpuInfo {
         name.trim().to_string()
     };
 
-    let baseDir = Path::new("/sys/devices/system/cpu");
+    let baseDir = path::Path::new("/sys/devices/system/cpu");
 
     let mut coreCount: usize = 0;
     let mut dieCount: usize = 0;
@@ -578,7 +654,7 @@ pub fn cpuInfo() -> CpuInfo {
     let threadCount = cpuInfoFile.matches("processor").count();
 
     let mut governors = Vec::<String>::new();
-    let policiesPath = Path::new("/sys/devices/system/cpu/cpufreq/");
+    let policiesPath = path::Path::new("/sys/devices/system/cpu/cpufreq/");
 
     let mut maxFrequency: usize = 0;
     let mut clockBoost: Option<bool> = None;
@@ -1013,6 +1089,160 @@ pub fn gpuMetrics() -> Option<GpuMetrics> {
     )
 }
 
+/// Returns a vector containing all NVME devices found in the system
+pub fn nvmeDevices() -> Vec<NvmeDevice> {
+    let mut devices = Vec::<NvmeDevice>::new();
+    let mut deviceNames = Vec::<String>::new();
+    let mut error = false;
+
+    match fs::read_dir(path::Path::new("/sys/class/nvme")) {
+        Err(_) => {
+            error = true
+        },
+
+        Ok(devs) => {
+            for device in devs {
+                deviceNames.push(device.unwrap().file_name().to_str().unwrap().to_string());
+            }
+        }
+    }
+
+    if error {
+        return devices;
+    }
+
+    let partitions = readFile("/proc/partitions");
+    for device in deviceNames {
+        let path = format!("/sys/class/nvme/{}", device.clone());
+
+        let deviceAddress = readFile(format!("{}/address", path));
+        let model = readFile(format!("{}/model", path));
+
+        let linkSpeed = {
+            let tmp = readFile(format!("{}/device/current_link_speed", path));
+            tmp.split(" ").collect::<Vec<&str>>()[0].to_string().parse::<f32>().unwrap()
+        };
+        let pcieLanes: usize = readFile(format!("{}/device/current_link_width", path)).parse().unwrap();
+
+        let mut size: usize = 0;
+        for partitionLine in partitions.split("\n") {
+            if partitionLine.contains(&device) {
+
+                let splitted = partitionLine.split(" ");
+                let collected = splitted.collect::<Vec<&str>>();
+
+                let tempSize = collected[collected.len() - 2];
+                size = tempSize.parse::<usize>().unwrap();
+            }
+        }
+
+        devices.push(
+            NvmeDevice {
+                device: device,
+                model: model,
+                pcieAddress: deviceAddress,
+                linkSpeedGTs: linkSpeed,
+                pcieLanes: pcieLanes,
+                size: ByteSize::new(size)
+            }
+        );
+    }
+
+    return devices;
+}
+
+/// Returns a vector containing all storage devices (NVME excluded) in the system
+pub fn storageDevices() -> Vec<StorageDevice> {
+    let baseDir = "/sys/class/block";
+
+    let mut error = false;
+    let mut dirContent = Vec::<String>::new();
+
+    match fs::read_dir(path::Path::new(baseDir)) {
+        Err(_) => {
+            error = true;
+        },
+        Ok(content) => {
+            for dir in content {
+                dirContent.push(dir.unwrap().file_name().to_str().unwrap().to_string())
+            }
+        }
+    }
+
+    if error {
+        return Vec::<StorageDevice>::new();
+    }
+
+    let mut devices = Vec::<StorageDevice>::new();
+    for dir in &dirContent {
+
+        if !dir.contains("sd") || dir.len() != 3 {
+            continue
+        }
+
+        let device = format!("/dev/{}", dir);
+        let size = ByteSize{
+            bytes: {
+                let tmp = readFile(format!("{}/{}/size", baseDir, dir));
+                match tmp.parse::<usize>() {
+                    Err(_) => 0,
+                    Ok(value) => value
+                }
+            }
+        };
+
+        let model = readFile(format!("{}/{}/device/model", baseDir, dir));
+        let mut partitions = Vec::<StoragePartition>::new();
+
+        for partitionDir in &dirContent {
+            if ! partitionDir.contains(&dir.clone()) {
+                continue
+            }
+
+            if partitionDir.len() <= 3 {
+                continue
+            }
+
+            let partitionSize = ByteSize{
+                bytes: {
+                    let tmp = readFile(format!("{}/{}/size", baseDir, partitionDir));
+                    match tmp.parse::<usize>() {
+                        Err(_) => 0,
+                        Ok(value) => value
+                    }
+                }
+            };
+
+            let startByte = {
+                let tmp = readFile(format!("{}/{}/start", baseDir, partitionDir));
+                match tmp.parse::<usize>() {
+                    Err(_) => 0,
+                    Ok(value) => value
+                }
+            };
+
+            partitions.push(
+                StoragePartition {
+                    device: format!("/dev/{}", partitionDir).to_string(),
+                    size: partitionSize,
+                    startPoint: startByte
+                }
+            );
+        }
+
+        devices.push(
+            StorageDevice {
+                model: model,
+                device: device,
+                size: size,
+                partitions: partitions
+            }
+        );
+    }
+
+    return devices;
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1044,6 +1274,8 @@ mod tests {
         println!("{:?}", motherboardInfo());
 
         println!("{:?}", gpuMetrics());
+        println!("{:?}", nvmeDevices());
+        println!("{:?}", storageDevices());
 
         assert_eq!(String::new(), String::new());
     }
