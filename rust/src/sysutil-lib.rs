@@ -1,13 +1,15 @@
 //! Linux system information library
+//!
+//! <div class="warning">This library is ment to be used only in linux systems. It is possible to write code using it on other systems, but it will not allow to run the code, panicking before execution </div>
+//!
 //! # Installation
 //!
-//! Include `sysutil` in your `Cargo.toml` as shown below:
-//! ```toml
-//! ...
+//! Run the following command in your terminal
 //!
-//! [dependencies]
-//! sysutil = "0.2.7";
+//! ```bash
+//! cargo add sysutil
 //! ```
+//!
 //! # Importation
 //! Add in your code:
 //! ```
@@ -256,6 +258,23 @@ pub struct ByteSize {
 }
 
 impl ByteSize {
+    /// The methods allow the convertion in the various size orders, both in base 1000 and base 1024
+    /// ```rust
+    /// let byteSize = /* some sysutil function returning ByteSize */;
+    /// byteSize.b(); // bytes
+    ///
+    /// byteSize.kb(); // 1000 bytes
+    /// byteSize.kib(); // 1024 bytes
+    ///
+    /// byteSize.mb(); // 1.000.000 bytes
+    /// byteSize.mib(); // 1.048.576 bytes
+    ///
+    /// byteSize.gb(); // 1.000.000.000 bytes
+    /// byteSize.gib(); //1.073.741.824 bytes
+    ///
+    /// byteSize.tb(); // 1.000.000.000.000 bytes
+    /// byteSize.tib(); // 1.099.511.627.776 bytes
+    /// ```
     fn new(value: usize) -> ByteSize {
         return ByteSize {
             bytes: value
@@ -316,6 +335,12 @@ pub struct StorageDevice {
     pub partitions: Vec<StoragePartition>
 }
 
+fn linuxCheck() {
+    if !path::Path::new("/sys").exists() || !path::Path::new("/proc").exists() {
+        panic!("Detected non-Linux system");
+    }
+}
+
 fn readFile<T>(filePath: T) -> String
 where T: AsRef<path::Path>, {
     if let Ok(mut file) = fs::File::open(filePath) {
@@ -352,6 +377,8 @@ fn battery_path() -> Option<path::PathBuf> {
 
 /// Returns battery current status and capacity as specified in `Battery` struct, returns `None` if it's not possible to retrieve data
 pub fn batteryInfo() -> Option<Battery> {
+    linuxCheck();
+
     let battery_path = battery_path()?;
     let capacity = readFile(battery_path.join("capacity"));
     let status = readFile(battery_path.join("status"));
@@ -372,12 +399,16 @@ pub fn batteryInfo() -> Option<Battery> {
 
 /// returns current GPU usage in percentage, returns `None` if it's not possible to retrieve data
 pub fn gpuUsage() -> Option<f32> {
+    linuxCheck();
+
     let fileContent = readFile("/sys/class/drm/card0/device/gpu_busy_percent");
     let gpuUsage = fileContent.parse::<f32>().ok()?;
     return Some(gpuUsage);
 }
 
 fn getStats() -> Vec<Vec<usize>> {
+    linuxCheck();
+
     let fileContent = readFile("/proc/stat");
 
     let lines = fileContent.split("\n");
@@ -407,6 +438,8 @@ fn getStats() -> Vec<Vec<usize>> {
 
 /// Returns CPU usage, both average and processor-wise, each value is in percentage
 pub fn cpuUsage() -> CpuUsage {
+    linuxCheck();
+
     let before = getStats();
     thread::sleep(Duration::from_millis(250));
     let after = getStats();
@@ -471,6 +504,8 @@ pub fn cpuUsage() -> CpuUsage {
 
 /// Returns current CPU frequency in MHz, returns `None` if it's not possible to retrieve data
 pub fn cpuFrequency() -> Option<f32> {
+    linuxCheck();
+
     let fileContent = readFile("/proc/cpuinfo");
     let mut frequencies: f32 = 0.0;
     let mut count = 0;
@@ -491,6 +526,8 @@ pub fn cpuFrequency() -> Option<f32> {
 
 /// Returns current RAM usage in percentage
 pub fn ramUsage() -> f32 {
+    linuxCheck();
+
     let content = readFile("/proc/meminfo");
 
     let mut memTotal = "";
@@ -558,6 +595,8 @@ fn getRate() -> (usize, usize) {
 
 /// Returns current network rate (downlaod and upload), expressed in bytes
 pub fn networkRate() -> NetworkRate {
+    linuxCheck();
+
     let (downBefore, upBefore) = getRate();
     thread::sleep(Duration::from_millis(500));
     let (downAfter, upAfter) = getRate();
@@ -573,6 +612,8 @@ pub fn networkRate() -> NetworkRate {
 
 /// Returns every temperature sensor in the system, using the `TemperatureSensor` struct
 pub fn temperatureSensors() -> Vec<TemperatureSensor> {
+    linuxCheck();
+
     let hwmonPath = path::Path::new("/sys/class/hwmon");
     let dirs = fs::read_dir(hwmonPath).unwrap();
 
@@ -597,6 +638,8 @@ pub fn temperatureSensors() -> Vec<TemperatureSensor> {
 
 /// Returns CPU base information, enclosed in the `CpuInfo` data structure
 pub fn cpuInfo() -> CpuInfo {
+    linuxCheck();
+
     let infoFile = readFile("/proc/cpuinfo");
     let modelName = {
         let mut name = String::new();
@@ -740,6 +783,8 @@ pub fn cpuInfo() -> CpuInfo {
 
 /// Returns RAM size using the `RamSize` data structure
 pub fn ramSize() -> RamSize {
+    linuxCheck();
+
     let content = readFile("/proc/meminfo");
 
     let mut memTotal = "";
@@ -768,6 +813,8 @@ pub fn ramSize() -> RamSize {
 
 /// Returns scheduler information for each processor
 pub fn schedulerInfo() -> Vec<SchedulerPolicy> {
+    linuxCheck();
+
     let schedulerDir = path::Path::new("/sys/devices/system/cpu/cpufreq/");
     let mut policies = Vec::<SchedulerPolicy>::new();
 
@@ -804,6 +851,8 @@ pub fn schedulerInfo() -> Vec<SchedulerPolicy> {
 
 /// Returns gpu's vram size as specified in `VramSize` struct, returns `None` if it's not possible to retrieve data
 pub fn vramSize() -> Option<VramSize> {
+    linuxCheck();
+
     let fileContent = readFile("/sys/class/drm/card0/device/mem_info_vram_total");
     match fileContent.parse::<usize>() {
         Err(_) => {
@@ -820,6 +869,8 @@ pub fn vramSize() -> Option<VramSize> {
 
 /// Returns gpu's vram usage in percentage, returns `None` if it's not possible to retrieve data
 pub fn vramUsage() -> Option<f32> {
+    linuxCheck();
+
     let vramTotal = readFile("/sys/class/drm/card0/device/mem_info_vram_total");
     let vramUsed = readFile("/sys/class/drm/card0/device/mem_info_vram_used");
 
@@ -898,6 +949,8 @@ fn getRoutes(file: String, separator: &str, routeType: RouteType) -> Vec<Network
 
 /// Returns a list of each internal network route
 pub fn networkRoutes() -> Vec<NetworkRoute> {
+    linuxCheck();
+
     let mut routes: Vec<NetworkRoute> = Vec::<NetworkRoute>::new();
 
     routes.append(
@@ -921,6 +974,8 @@ pub fn networkRoutes() -> Vec<NetworkRoute> {
 
 /// Returns the currently active clock source and the different ones available, enclosed in `ClockSource` struct
 pub fn clockSource() -> ClockSource {
+    linuxCheck();
+
     let currentClockSource = readFile(
         "/sys/devices/system/clocksource/clocksource0/current_clocksource"
     );
@@ -942,6 +997,8 @@ pub fn clockSource() -> ClockSource {
 
 /// Returns information about the currently installed BIOS
 pub fn biosInfo() -> Bios {
+    linuxCheck();
+
     let vendor = String::from(readFile("/sys/devices/virtual/dmi/id/bios_vendor").trim());
     let release = String::from(readFile("/sys/devices/virtual/dmi/id/bios_release").trim());
 
@@ -958,6 +1015,8 @@ pub fn biosInfo() -> Bios {
 
 /// Returns information about the motherboard
 pub fn motherboardInfo() -> Motherboard {
+    linuxCheck();
+
     let name = String::from(readFile("/sys/devices/virtual/dmi/id/board_name").trim());
     let vendor = String::from(readFile("/sys/devices/virtual/dmi/id/board_vendor").trim());
 
@@ -1009,7 +1068,9 @@ fn bytesToU64(bytes: Vec<u8>) -> u64 {
 }
 
 /// Returns metrics parameters from the amdgpu driver
-pub fn gpuMetrics() -> Option<GpuMetrics> {
+pub fn gpuMetrics() -> Option<GpuMetrics>   {
+    linuxCheck();
+
     let filePipe = fs::read(path::Path::new("/sys/class/drm/card0/device/gpu_metrics"));
 
     let mut bytes: Vec<u8> = Vec::<u8>::new();
@@ -1091,6 +1152,8 @@ pub fn gpuMetrics() -> Option<GpuMetrics> {
 
 /// Returns a vector containing all NVME devices found in the system
 pub fn nvmeDevices() -> Vec<NvmeDevice> {
+    linuxCheck();
+
     let mut devices = Vec::<NvmeDevice>::new();
     let mut deviceNames = Vec::<String>::new();
     let mut error = false;
@@ -1153,6 +1216,8 @@ pub fn nvmeDevices() -> Vec<NvmeDevice> {
 
 /// Returns a vector containing all storage devices (NVME excluded) in the system
 pub fn storageDevices() -> Vec<StorageDevice> {
+    linuxCheck();
+
     let baseDir = "/sys/class/block";
 
     let mut error = false;
@@ -1277,6 +1342,6 @@ mod tests {
         println!("{:?}", nvmeDevices());
         println!("{:?}", storageDevices());
 
-        assert_eq!(String::new(), String::new());
+        assert_eq!(0_u8, 0_u8);
     }
 }

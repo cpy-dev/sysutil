@@ -1,6 +1,14 @@
 # sysutil-lib
 - Linux system information library
 
+## Warning
+- this library is ment to be used only in linux systems
+- it is possible to write code using it on other systems, but it will not allow to run the code, raising an exception before execution
+
+## Other implementations
+- this library is also available for Rust 
+- check it out at [crates.io](https://crates.io/crates/sysutil)
+
 ## Importation
 ```python
 import sysutil

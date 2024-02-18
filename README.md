@@ -11,7 +11,7 @@
 - feel free to contribute adding features and / or translate the library in other languages
 
 ## Rust
-### [Rust Documentation](https://github.com/ryzeon-dev/sysutil/blob/master/rust/README.md)
+### [Rust Documentation](https://docs.rs/sysutil/latest/sysutil/)
 ### Installation
 - run in terminal
 ```bash

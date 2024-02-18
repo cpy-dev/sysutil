@@ -197,6 +197,10 @@ class StorageDevice:
     size: ByteSize
     partitions: [StoragePartition]
 
+def __linuxCheck():
+    if not os.path.exists('/sys') or not os.path.exists('/proc'):
+        raise Exception('Detected non-Linux system')
+
 def __readFile(filePath):
     try:
         with open(filePath, 'r') as file:
@@ -231,6 +235,8 @@ def __batteryPath():
     return battery
 
 def batteryInfo():
+    __linuxCheck()
+
     batteryPath = __batteryPath()
 
     if batteryPath is None:
@@ -281,6 +287,8 @@ def batteryInfo():
     )
 
 def gpuUsage():
+    __linuxCheck()
+
     try:
         with open('/sys/class/drm/card0/device/gpu_busy_percent', 'r') as file:
             return float(file.read().strip())
@@ -311,6 +319,8 @@ def __getStats():
     return intLines
 
 def cpuUsage():
+    __linuxCheck()
+
     before = __getStats()
     time.sleep(0.25)
     after = __getStats()
@@ -344,6 +354,8 @@ def cpuUsage():
     )
 
 def cpuFrequency():
+    __linuxCheck()
+
     with open('/proc/cpuinfo', 'r') as file:
         fileContent = file.read()
 
@@ -361,6 +373,8 @@ def cpuFrequency():
     return None
 
 def ramUsage():
+    __linuxCheck()
+
     with open('/proc/meminfo', 'r') as file:
         fileContent = file.read()
 
@@ -397,6 +411,8 @@ def __getRate():
     return downloadRate, uploadRate
 
 def networkRate():
+    __linuxCheck()
+
     downBefore, upBefore = __getRate()
     time.sleep(0.5)
     downAfter, upAfter = __getRate()
@@ -407,6 +423,8 @@ def networkRate():
     )
 
 def temperatureSensors():
+    __linuxCheck()
+
     DRIVER_DIR = '/sys/class/hwmon'
     sensorsDirectories = os.listdir(DRIVER_DIR)
 
@@ -431,6 +449,8 @@ def temperatureSensors():
     return sensors
 
 def cpuInfo():
+    __linuxCheck()
+
     with open('/proc/cpuinfo', 'r') as file:
         infoFile = file.read()
 
@@ -528,6 +548,8 @@ def cpuInfo():
     )
 
 def ramSize():
+    __linuxCheck()
+
     with open('/proc/meminfo', 'r') as file:
         memInfo = file.read().split('\n')
 
@@ -546,6 +568,8 @@ def ramSize():
     )
 
 def schedulerInfo():
+    __linuxCheck()
+
     DRIVER_DIR = '/sys/devices/system/cpu/cpufreq'
     policies = []
 
@@ -580,6 +604,8 @@ def schedulerInfo():
     return policies
 
 def vramSize():
+    __linuxCheck()
+
     try:
         with open('/sys/class/drm/card0/device/mem_info_vram_total', 'r') as file:
             fileContent = file.read()
@@ -594,6 +620,8 @@ def vramSize():
         return None
 
 def vramUsage():
+    __linuxCheck()
+
     try:
         with open('/sys/class/drm/card0/device/mem_info_vram_total', 'r') as file:
             fileContent = file.read()
@@ -664,6 +692,8 @@ def __getRoutes(filePath, separator, routeType):
     return routes
 
 def networkRoutes():
+    __linuxCheck()
+
     routes = []
 
     routes.extend(
@@ -693,6 +723,8 @@ def networkRoutes():
     return routes
 
 def clockSource():
+    __linuxCheck()
+
     currentClockSource = ''
     try:
         with open('/sys/devices/system/clocksource/clocksource0/current_clocksource', 'r') as file:
@@ -713,6 +745,8 @@ def clockSource():
     )
 
 def biosInfo():
+    __linuxCheck()
+
     vendor = ''
     try:
         with open('/sys/devices/virtual/dmi/id/bios_vendor', 'r') as file:
@@ -749,6 +783,8 @@ def biosInfo():
     )
 
 def motherboardInfo():
+    __linuxCheck()
+
     name = ''
     try:
         with open('/sys/devices/virtual/dmi/id/board_name', 'r') as file:
@@ -792,6 +828,8 @@ def __bytesToInt(bytes):
     return res
 
 def gpuMetrics():
+    __linuxCheck()
+
     try:
         with open('/sys/class/drm/card0/device/gpu_metrics', 'rb') as file:
             bytes = file.read()
@@ -825,6 +863,8 @@ def gpuMetrics():
     )
 
 def nvmeDevices():
+    __linuxCheck()
+
     baseDir = '/sys/class/nvme'
 
     try:
@@ -862,6 +902,8 @@ def nvmeDevices():
     return devices
 
 def storageDevices():
+    __linuxCheck()
+
     baseDir = '/sys/class/block'
 
     try:
