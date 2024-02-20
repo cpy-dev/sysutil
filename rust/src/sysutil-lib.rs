@@ -248,33 +248,34 @@ pub struct NvmeDevice {
     pub model: String,
     pub linkSpeedGTs: f32,
     pub pcieLanes: usize,
-    pub size: ByteSize
+    pub size: ByteSize,
+    pub partitions: Vec<StoragePartition>
 }
 
 /// Bytes size data structure implementing methods to convert in various size orders
+/// The methods allow the convertion in the various size orders, both in base 1000 and base 1024
+/// ```rust
+/// let byteSize = /* some sysutil function returning ByteSize */;
+/// byteSize.b(); // bytes
+///
+/// byteSize.kb(); // 1000 bytes
+/// byteSize.kib(); // 1024 bytes
+///
+/// byteSize.mb(); // 1.000.000 bytes
+/// byteSize.mib(); // 1.048.576 bytes
+///
+/// byteSize.gb(); // 1.000.000.000 bytes
+/// byteSize.gib(); //1.073.741.824 bytes
+///
+/// byteSize.tb(); // 1.000.000.000.000 bytes
+/// byteSize.tib(); // 1.099.511.627.776 bytes
+/// ```
 #[derive(Debug)]
 pub struct ByteSize {
     bytes: usize
 }
 
 impl ByteSize {
-    /// The methods allow the convertion in the various size orders, both in base 1000 and base 1024
-    /// ```rust
-    /// let byteSize = /* some sysutil function returning ByteSize */;
-    /// byteSize.b(); // bytes
-    ///
-    /// byteSize.kb(); // 1000 bytes
-    /// byteSize.kib(); // 1024 bytes
-    ///
-    /// byteSize.mb(); // 1.000.000 bytes
-    /// byteSize.mib(); // 1.048.576 bytes
-    ///
-    /// byteSize.gb(); // 1.000.000.000 bytes
-    /// byteSize.gib(); //1.073.741.824 bytes
-    ///
-    /// byteSize.tb(); // 1.000.000.000.000 bytes
-    /// byteSize.tib(); // 1.099.511.627.776 bytes
-    /// ```
     fn new(value: usize) -> ByteSize {
         return ByteSize {
             bytes: value
@@ -322,6 +323,8 @@ impl ByteSize {
 #[derive(Debug)]
 pub struct StoragePartition {
     pub device: String,
+    pub mountPoint: String,
+    pub fileSystem: String,
     pub size: ByteSize,
     pub startPoint: usize
 }
@@ -1175,6 +1178,8 @@ pub fn nvmeDevices() -> Vec<NvmeDevice> {
     }
 
     let partitions = readFile("/proc/partitions");
+    let mountPoints = readFile("/proc/mounts");
+
     for device in deviceNames {
         let path = format!("/sys/class/nvme/{}", device.clone());
 
@@ -1199,6 +1204,47 @@ pub fn nvmeDevices() -> Vec<NvmeDevice> {
             }
         }
 
+        let mut localPartitions = Vec::<StoragePartition>::new();
+        for mount in mountPoints.split("\n") {
+            if mount.contains(&device) {
+                let splitted: Vec<&str> = mount.split(" ").collect();
+                let device = splitted.get(0).unwrap().to_string();
+                let deviceName: String = device.split("/").collect::<Vec<&str>>().get(2).unwrap().to_string();
+
+                let mountPoint = splitted.get(1).unwrap().to_string();
+                let fileSystem = splitted.get(2).unwrap().to_string();
+
+                let mut partSize = ByteSize{bytes: 0};
+                let mut startPoint = 0;
+
+                for partition in partitions.split("\n") {
+                    if partition.contains(&deviceName) {
+
+                         partSize = ByteSize{
+                             bytes: {
+                                 let tmp = readFile(format!("/sys/class/block/{}/size", deviceName));
+                                 tmp.parse::<usize>().unwrap()
+                             }
+                         };
+
+                        startPoint = {
+                            let tmp = readFile(format!("/sys/class/block/{}/start", deviceName));
+                            tmp.parse::<usize>().unwrap()
+                        };
+                        break
+                    }
+                }
+
+                localPartitions.push(StoragePartition{
+                    device: device,
+                    mountPoint: mountPoint,
+                    fileSystem: fileSystem,
+                    size: partSize,
+                    startPoint: startPoint
+                });
+            }
+        }
+
         devices.push(
             NvmeDevice {
                 device: device,
@@ -1206,7 +1252,8 @@ pub fn nvmeDevices() -> Vec<NvmeDevice> {
                 pcieAddress: deviceAddress,
                 linkSpeedGTs: linkSpeed,
                 pcieLanes: pcieLanes,
-                size: ByteSize::new(size)
+                size: ByteSize::new(size),
+                partitions: localPartitions
             }
         );
     }
@@ -1237,6 +1284,8 @@ pub fn storageDevices() -> Vec<StorageDevice> {
     if error {
         return Vec::<StorageDevice>::new();
     }
+
+    let mountPoints = readFile("/proc/mounts");
 
     let mut devices = Vec::<StorageDevice>::new();
     for dir in &dirContent {
@@ -1286,10 +1335,26 @@ pub fn storageDevices() -> Vec<StorageDevice> {
                 }
             };
 
+            let mut mountPoint = String::new();
+            let mut filesystem = String::new();
+
+            for mount in mountPoints.split("\n") {
+                if mount.contains(&format!("/dev/{} ", partitionDir).to_string()) {
+                    let splittedLine: Vec<&str> = mount.split(" ").collect();
+
+                    mountPoint = splittedLine.get(1).unwrap().to_string();
+                    filesystem = splittedLine.get(2).unwrap().to_string();
+
+                    break
+                }
+            }
+
             partitions.push(
                 StoragePartition {
                     device: format!("/dev/{}", partitionDir).to_string(),
                     size: partitionSize,
+                    mountPoint: mountPoint,
+                    fileSystem: filesystem,
                     startPoint: startByte
                 }
             );

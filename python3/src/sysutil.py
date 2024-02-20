@@ -176,6 +176,14 @@ class ByteSize:
         return self.__bytes / 1024 / 1024 / 1024 / 1024
 
 @dataclasses.dataclass
+class StoragePartition:
+    device: str
+    mountPoint: str
+    filesystem: str
+    size: ByteSize
+    startPoint: str
+
+@dataclasses.dataclass
 class NvmeDevice:
     device: str
     pcieAddress: str
@@ -183,12 +191,7 @@ class NvmeDevice:
     linkSpeedGTs: float
     pcieLanes: int
     size: ByteSize
-
-@dataclasses.dataclass
-class StoragePartition:
-    device: str
-    size: ByteSize
-    startPoint: str
+    partitions: [StoragePartition]
 
 @dataclasses.dataclass
 class StorageDevice:
@@ -873,7 +876,8 @@ def nvmeDevices():
         return []
 
     devices = []
-    partitions = __readFile('/proc/partitions')
+    partitions = __readFile('/proc/partitions').strip()
+    mountPoints = __readFile('/proc/mounts').strip()
 
     for device in dirContent:
         address = __readFile(f'{baseDir}/{device}/address').strip()
@@ -890,13 +894,56 @@ def nvmeDevices():
             if device in partitionLine:
                 size = int(partitionLine.split(' ')[-2])
 
+        localPartitions = []
+        for mount in mountPoints.split('\n'):
+
+            if device in mount:
+                splitted = mount.split(' ')
+                device = splitted[0]
+                deviceName = device.split('/')[2]
+
+                mountPoint = splitted[1]
+                filesystem = splitted[2]
+
+                partSize = ByteSize(0)
+                startPoint = 0
+
+                for partition in partitions.split('\n'):
+                    if deviceName in partition:
+                        try:
+                            partSize = ByteSize(
+                                int(
+                                    __readFile(f'/sys/class/block/{deviceName}/size').strip()
+                                )
+                            )
+                        except:
+                            pass
+
+                        try:
+                            startPoint = int(
+                                __readFile(f'/sys/class/block/{deviceName}/start').strip()
+                            )
+                        except:
+                            pass
+
+                        break
+
+                localPartitions.append(StoragePartition(
+                    device=device,
+                    mountPoint=mountPoint,
+                    filesystem=filesystem,
+                    size=partSize,
+                    startPoint=startPoint
+                ))
+
         devices.append(NvmeDevice(
             device=device,
             model=model,
             pcieAddress=address,
             linkSpeedGTs=linkSpeed,
             pcieLanes=pcieLanes,
-            size=ByteSize(size)
+            size=ByteSize(size),
+            partitions=localPartitions
         ))
 
     return devices
@@ -910,6 +957,8 @@ def storageDevices():
         dirContent = os.listdir(baseDir)
     except:
         return []
+
+    mountPoints = __readFile('/proc/mounts').split('\n')
 
     devices = []
     for dir in dirContent:
@@ -941,9 +990,22 @@ def storageDevices():
             startByte = __readFile(f'{baseDir}/{partitionDir}/start').strip()
             startByte = ByteSize(int(startByte) if startByte else 0)
 
+            mountPoint = ''
+            fileSystem = ''
+
+            for mount in mountPoints:
+                if f'/dev/{partitionDir} ' in mount:
+                    splitted = mount.split(' ')
+
+                    mountPoint = splitted[1]
+                    fileSystem = splitted[2]
+                    break
+
             partitions.append(
                 StoragePartition(
                     device=f'/dev/{partitionDir}',
+                    mountPoint=mountPoint,
+                    filesystem=fileSystem,
                     size=partitionSize,
                     startPoint=startByte
                 )

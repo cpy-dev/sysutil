@@ -6,7 +6,7 @@
 - it is possible to write code using it on other systems, but it will not allow to run the code, raising an exception before execution
 
 ## Other implementations
-- this library is also available for Rust 
+- this library is also available for Rust
 - check it out at [crates.io](https://crates.io/crates/sysutil)
 
 ## Importation
@@ -212,6 +212,7 @@ class NvmeDevice:
     linkSpeedGTs: float
     pcieLanes: int
     size: ByteSize
+    partitions: [StoragePartition]
 ```
 - Contains NVME device information
 
@@ -219,6 +220,8 @@ class NvmeDevice:
 ```python
 class StoragePartition:
     device: str
+    mountPoint: str
+    filesystem: str
     size: ByteSize
     startPoint: str
 ```
