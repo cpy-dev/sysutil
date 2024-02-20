@@ -24,12 +24,70 @@
 #![allow(non_camel_case_types)]
 
 use std::fs;
-use std::io::Read;
+use std::error::Error;
+use std::io::{BufRead, BufReader, Read};
 use std::path;
 use std::process::Command;
 use std::thread;
 use std::time::Duration;
 use std::i64;
+
+
+/// Information about the current distribution
+#[derive(Default, Debug)]
+pub struct DistributionInfo {
+    pub bug_report_url: String,
+    pub build_id: String,
+    pub documentation_utl: String,
+    pub home_url: String,
+    pub id: String,
+    pub logo: String,
+    pub name: String,
+    pub pretty_name: String,
+    pub support_url: String,
+    pub version: String,
+    pub version_codename: String,
+    pub version_id: String,
+}
+
+/// Returns information about current distribution
+/// ## Example
+/// ```rust
+/// use sysutil::DistributionInfo;
+///
+/// let info = DistributionInfo::new();
+/// println!("{:?}", info);
+/// ```
+impl DistributionInfo {
+    pub fn new() -> Result<DistributionInfo, Box<dyn Error>> {
+        let mut distribution_info = DistributionInfo::default();
+        let file = fs::File::open("/etc/os-release")?;
+        let buf_reader = BufReader::new(file);
+        
+        for line in buf_reader.lines() {
+            let line = line?;
+            let line = line.trim().split_once("=").ok_or("Failed to split line")?.to_owned();
+            
+            match line.0 {
+                "BUG_REPORT_URL" => distribution_info.bug_report_url = line.1.to_string(),
+                "BUILD_ID" => distribution_info.build_id = line.1.to_string(),
+                "DOCUMENTATION_URL" => distribution_info.documentation_utl = line.1.to_string(),
+                "HOME_URL" => distribution_info.home_url = line.1.to_string(),
+                "ID" => distribution_info.id = line.1.to_string(),
+                "LOGO" => distribution_info.logo = line.1.to_string(),
+                "NAME" => distribution_info.name = line.1.to_string(),
+                "PRETTY_NAME" => distribution_info.pretty_name = line.1.to_string(),
+                "SUPPORT_URL" => distribution_info.support_url = line.1.to_string(),
+                "VERSION" => distribution_info.version = line.1.to_string(),
+                "VERSION_CODENAME" => distribution_info.version_codename = line.1.to_string(),
+                "VERSION_ID" => distribution_info.version_id = line.1.to_string(),
+                _ => {},
+            };
+        }
+
+        Ok(distribution_info)
+    }
+}
 
 /// Represents the current status of battery
 #[derive(Debug)]
@@ -1421,6 +1479,8 @@ mod tests {
         println!("{:?}", gpuMetrics());
         println!("{:?}", nvmeDevices());
         println!("{:?}", storageDevices());
+
+        println!("{:?}", DistributionInfo::new());
 
         assert_eq!(0_u8, 0_u8);
     }
