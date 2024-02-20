@@ -119,7 +119,9 @@ pub struct CpuInfo {
 /// ## Example
 /// Once generating a `CPU` instance, usages and scheduler policies can be updated by the `update()` method
 /// ```rust
-/// let cpu = CPU::new();
+/// use sysutil::CPU;
+///
+/// let mut cpu = CPU::new();
 /// cpu.update();
 /// ```
 #[derive(Debug)]
@@ -255,7 +257,11 @@ pub struct NvmeDevice {
 /// Bytes size data structure implementing methods to convert in various size orders
 /// The methods allow the convertion in the various size orders, both in base 1000 and base 1024
 /// ```rust
-/// let byteSize = /* some sysutil function returning ByteSize */;
+/// use sysutil::nvmeDevices;
+///
+/// // Example:
+/// let nvme_devices = nvmeDevices();
+/// let byteSize = &nvme_devices[0].size;
 /// byteSize.b(); // bytes
 ///
 /// byteSize.kb(); // 1000 bytes
@@ -630,6 +636,15 @@ pub fn temperatureSensors() -> Vec<TemperatureSensor> {
 
         let temperatureFile = dirPath.join("temp1_input");
         let temperature = readFile(temperatureFile.to_str().unwrap());
+
+        if temperature.is_empty() {
+            sensors.push(TemperatureSensor {
+                label: label,
+                temperature: None,
+            });
+
+            continue;
+        }
 
         sensors.push(TemperatureSensor {
             label: label,
