@@ -439,8 +439,9 @@ def temperatureSensors():
         with open(f'{DRIVER_DIR}/{directory}/temp1_input', 'r') as temperatureFile:
             try:
                 temperature = float(temperatureFile.read()) / 1000
+
             except:
-                None
+                temperature = None
 
         sensors.append(
             TemperatureSensor(
@@ -488,8 +489,8 @@ def cpuInfo():
                     coreCount = int(coreId)
         except:
             pass
-
-    coreCount += 1
+    if coreCount % 2:
+        coreCount += 1
     dieCount += 1
 
     with open('/proc/cpuinfo', 'r') as file:
