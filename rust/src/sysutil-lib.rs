@@ -129,18 +129,23 @@ pub struct CPU {
     pub info: CpuInfo,
     pub averageUsage: ProcessorUsage,
     pub perProcessorUsage: Vec<ProcessorUsage>,
-    pub schedulerPolicies: Vec<SchedulerPolicy>
+    pub schedulerPolicies: Vec<SchedulerPolicy>,
+    pub averageFrequency: Frequency,
+    pub perProcessorFrequency: Vec<ProcessorFrequency>
 }
 
 impl CPU {
     pub fn new() -> CPU {
         let cpuUsage = cpuUsage();
+        let frequency = cpuFrequency();
 
         CPU {
             info: cpuInfo(),
             averageUsage: cpuUsage.average,
             perProcessorUsage: cpuUsage.processors,
-            schedulerPolicies: schedulerInfo()
+            schedulerPolicies: schedulerInfo(),
+            averageFrequency: frequency.average,
+            perProcessorFrequency: frequency.processors
         }
     }
 
@@ -151,6 +156,49 @@ impl CPU {
         self.averageUsage = cpuUsage.average;
         self.perProcessorUsage = cpuUsage.processors;
     }
+}
+
+/// Frequency data structure implements direct conversion for frequencies
+/// in various size orders
+/// ```rust
+/// use sysutil::cpuFrequency;
+/// let frequency = cpuFrequency().average;
+///
+/// frequency.khz(); // returns the frequency in Kilo Hertz
+/// frequency.mhz(); // returns the frequency in Mega Hertz
+/// frequency.ghz(); // return the frequency in Giga Hertz
+/// ```
+#[derive(Debug)]
+pub struct Frequency {
+    khz: usize
+}
+
+impl Frequency {
+    pub fn khz(&self) -> f32 {
+        return self.khz as f32;
+    }
+
+    pub fn mhz(&self) -> f32 {
+        return self.khz as f32 / 1000_f32;
+    }
+
+    pub fn ghz(&self) -> f32 {
+        return self.khz as f32 / 1000_000_f32;
+    }
+}
+
+/// Contains processor id and its frequency
+#[derive(Debug)]
+pub struct ProcessorFrequency {
+    pub processorID: String,
+    pub frequency: Frequency
+}
+
+/// Contains cpu frequencies, both average and processor wise
+#[derive(Debug)]
+pub struct CpuFrequency {
+    pub average: Frequency,
+    pub processors: Vec<ProcessorFrequency>
 }
 
 /// Contains total ram size, both in GB (1000^3 bytes) and GiB (1024^3 bytes)
@@ -505,28 +553,6 @@ pub fn cpuUsage() -> CpuUsage {
         average: processors[0].clone(),
         processors: processors[1..].to_vec(),
     };
-}
-
-/// Returns current CPU frequency in MHz, returns `None` if it's not possible to retrieve data
-pub fn cpuFrequency() -> Option<f32> {
-    linuxCheck();
-
-    let fileContent = readFile("/proc/cpuinfo");
-    let mut frequencies: f32 = 0.0;
-    let mut count = 0;
-
-    for line in fileContent.split("\n") {
-        if line.find("cpu MHz") != None {
-            frequencies += line.split(" ").last().unwrap().parse::<f32>().unwrap();
-            count += 1;
-        }
-    }
-
-    if frequencies != 0_f32 {
-        return Some(frequencies / (count as f32));
-    }
-
-    return None;
 }
 
 /// Returns current RAM usage in percentage
@@ -1380,6 +1406,52 @@ pub fn storageDevices() -> Vec<StorageDevice> {
     return devices;
 }
 
+/// Returns cpu frequency, both average and processor wise
+pub fn cpuFrequency() -> CpuFrequency {
+    linuxCheck();
+    let mut totalFreq: f32 = 0_f32;
+    let mut frequencies: Vec<ProcessorFrequency> = Vec::new();
+
+    let fileContent = readFile("/proc/cpuinfo");
+    for chunk in fileContent.split("\n\n") {
+
+        if chunk.is_empty() {
+            continue
+        }
+
+        let mut id = String::new();
+        let mut freq: f32 = 0_f32;
+
+        for line in chunk.split("\n") {
+            if line.contains("processor") {
+                id = line.trim().split(":").last().unwrap().trim().to_string();
+
+            } else if line.contains("cpu MHz") {
+                freq = line.trim().split(":").last().unwrap().trim().parse::<f32>().unwrap();
+            }
+        }
+
+        if id.is_empty() || freq == 0_f32 {
+            continue
+        }
+
+        totalFreq += freq;
+        frequencies.push(ProcessorFrequency{
+            processorID: id,
+            frequency: Frequency {
+                khz: (freq * 1000.0) as usize
+            }
+        });
+    }
+
+    CpuFrequency {
+        average: Frequency {
+            khz: (totalFreq * 1000.0) as usize / frequencies.len()
+        },
+        processors: frequencies
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1406,6 +1478,8 @@ mod tests {
 
         let cpu = CPU::new();
         println!("{:?}", cpu);
+
+        println!("{:?}", cpuFrequency());
 
         println!("{:?}", clockSource());
         println!("{:?}", motherboardInfo());

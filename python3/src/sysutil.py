@@ -200,6 +200,29 @@ class StorageDevice:
     size: ByteSize
     partitions: [StoragePartition]
 
+@dataclasses.dataclass
+class Frequency:
+    _khz: float
+
+    def khz(self):
+        return self._khz
+
+    def mhz(self):
+        return self._khz / 1000
+
+    def ghz(self):
+        return self._khz / 1000_000
+
+@dataclasses.dataclass
+class ProcessorFrequency:
+    processorID: str
+    frequency: Frequency
+
+@dataclasses.dataclass
+class CpuFrequency:
+    average: Frequency
+    processors: [ProcessorFrequency]
+
 def __linuxCheck():
     if not os.path.exists('/sys') or not os.path.exists('/proc'):
         raise Exception('Detected non-Linux system')
@@ -355,25 +378,6 @@ def cpuUsage():
         average=processors[0],
         processors=processors[1:]
     )
-
-def cpuFrequency():
-    __linuxCheck()
-
-    with open('/proc/cpuinfo', 'r') as file:
-        fileContent = file.read()
-
-    frequencies = 0
-    count = 0
-
-    for line in fileContent.split('\n'):
-        if 'cpu MHz' in line:
-
-            frequencies += float(line.split(' ')[-1])
-            count += 1
-
-    if frequencies:
-        return frequencies / count
-    return None
 
 def ramUsage():
     __linuxCheck()
@@ -1023,6 +1027,46 @@ def storageDevices():
 
     return devices
 
+def cpuFrequency():
+    __linuxCheck()
+
+    totalFreq = 0
+    frequencies = []
+
+    fileContent = __readFile('/proc/cpuinfo')
+    for chunk in fileContent.split('\n\n'):
+        if not chunk or chunk == ' ':
+            continue
+
+        id = ''
+        freq = 0
+
+        for line in chunk.split('\n'):
+            if 'processor' in line:
+                id = line.strip().split(':')[-1]
+
+            elif 'cpu MHz' in line:
+                freq = float(line.strip().split(':')[-1])
+
+        if not id or freq == 0:
+            continue
+
+        totalFreq += freq * 1000
+        frequencies.append(
+            ProcessorFrequency(
+                processorID=id,
+                frequency=Frequency(
+                    _khz=freq * 1000
+                )
+            )
+        )
+
+    return CpuFrequency(
+        average=Frequency(
+            _khz=totalFreq * 1000 / len(frequencies)
+        ),
+        processors=frequencies
+    )
 
 if __name__ == '__main__':
     print(cpuUsage())
@@ -1044,6 +1088,7 @@ if __name__ == '__main__':
     print(networkRoutes())
 
     print(CPU())
+    print(cpuFrequency())
 
     print(clockSource())
     print(motherboardInfo())

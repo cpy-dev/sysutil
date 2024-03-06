@@ -237,15 +237,39 @@ class StorageDevice:
 ```
 - Contains information relative to a storage device in the system
 
+### Frequency
+```python
+class Frequency:
+    _khz: float
+```
+- Contains frequency value in kHz, implements conversion methods for kHz, MHz, GHz
+
+### ProcessorFrequency:
+```python
+class ProcessorFrequency:
+    processorID: str
+    frequency: Frequency
+```
+- Contains processor id and its frequency 
+
+### CpuFrequency:
+```python
+class CpuFrequency:
+    average: Frequency
+    processors: [ProcessorFrequency]
+```
+- Contains cpu frequency, both average and processor wise
+
 ## Functions
 ```python3
 def cpuUsage() -> CpuUsage
 ```
 - returns the cpu usage, both average and processor-wise, all the values are percentage
+
 ```python3
-def cpuFrequency() -> float
+def cpuFrequency() -> CpuFrequency
 ```
-- returns CPU frequency in MHz
+- returns CPU frequency, both average and processor wise
 
 ```python3
 def ramUsage() -> float
