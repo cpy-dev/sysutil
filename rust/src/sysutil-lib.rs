@@ -32,7 +32,7 @@ use std::time::Duration;
 use std::i64;
 
 /// Represents the current status of battery
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum BatteryStatus {
     Charging,
     Discharging,
@@ -40,7 +40,7 @@ pub enum BatteryStatus {
 }
 
 /// Contains capacity and current status of battery
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Battery {
     pub capacity: u8,
     pub status: BatteryStatus,
@@ -53,14 +53,14 @@ impl Battery {
 }
 
 /// Contains the average CPU usage and the discrete usage for each processor
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct CpuUsage {
     pub average: ProcessorUsage,
     pub processors: Vec<ProcessorUsage>,
 }
 
 /// Encloses the different parameters relative to processor usage
-#[derive(Clone, Debug)]
+#[derive(Debug, , Copy, Clone)]
 pub struct ProcessorUsage {
     pub total: f32,
     pub user: f32,
@@ -88,21 +88,21 @@ impl ProcessorUsage {
 }
 
 /// Contains total download and upload newtwork rate (in bytes)
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct NetworkRate {
     pub download: f32,
     pub upload: f32,
 }
 
 /// Contains temperature sensor's name and recorded temperature
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct TemperatureSensor {
     pub label: String,
     pub temperature: Option<f32>,
 }
 
 /// Contains base information relative to the CPU
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct CpuInfo {
     pub modelName: String,
     pub cores: usize,
@@ -124,7 +124,7 @@ pub struct CpuInfo {
 /// let mut cpu = sysutil::CPU::new();
 /// cpu.update();
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct CPU {
     pub info: CpuInfo,
     pub averageUsage: ProcessorUsage,
@@ -168,7 +168,7 @@ impl CPU {
 /// frequency.mhz(); // returns the frequency in Mega Hertz
 /// frequency.ghz(); // return the frequency in Giga Hertz
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Frequency {
     khz: usize
 }
@@ -188,28 +188,28 @@ impl Frequency {
 }
 
 /// Contains processor id and its frequency
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct ProcessorFrequency {
     pub processorID: String,
     pub frequency: Frequency
 }
 
 /// Contains cpu frequencies, both average and processor wise
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct CpuFrequency {
     pub average: Frequency,
     pub processors: Vec<ProcessorFrequency>
 }
 
 /// Contains total ram size, both in GB (1000^3 bytes) and GiB (1024^3 bytes)
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct RamSize {
     pub gb: f32,
     pub gib: f32,
 }
 
 /// Contains scheduler information relative to a processor in the system
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct SchedulerPolicy {
     pub name: String,
     pub scalingGovernor: String,
@@ -219,14 +219,14 @@ pub struct SchedulerPolicy {
 }
 
 /// Contains total gpu's vram size, both in GB (1000^3 bytes) and GiB (1024^3 bytes)
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct VramSize {
     pub gb: f32,
     pub gib: f32
 }
 
 /// Different route types
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone)]
 pub enum RouteType {
     TCP,
     TCP6,
@@ -235,7 +235,7 @@ pub enum RouteType {
 }
 
 /// Represents a network route and its type, containing local address+port and remote address+port
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct NetworkRoute {
     pub routeType: RouteType,
     pub localAddress: String,
@@ -245,14 +245,14 @@ pub struct NetworkRoute {
 }
 
 /// Contains currently active clock source and the available ones
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct ClockSource {
     pub current: String,
     pub available: Vec<String>
 }
 
 /// Contains information relative to the motherboard and the installed bios
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Motherboard {
     pub name: String,
     pub vendor: String,
@@ -261,7 +261,7 @@ pub struct Motherboard {
 }
 
 /// Contains information relative to the installed bios
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct Bios {
     pub vendor: String,
     pub release: String,
@@ -270,7 +270,7 @@ pub struct Bios {
 }
 
 /// Encloses gpu metrics parameters
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct GpuMetrics {
     pub temperatureEdge: u16,
     pub temperatureHotspot: u16,
@@ -291,7 +291,7 @@ pub struct GpuMetrics {
 }
 
 /// Contains NVME device information
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct NvmeDevice {
     pub device: String,
     pub pcieAddress: String,
@@ -320,7 +320,7 @@ pub struct NvmeDevice {
 /// byteSize.tb(); // 1.000.000.000.000 bytes
 /// byteSize.tib(); // 1.099.511.627.776 bytes
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct ByteSize {
     bytes: usize
 }
@@ -370,7 +370,7 @@ impl ByteSize {
 }
 
 /// Encloses device name, size and startpoint relative to a partition
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct StoragePartition {
     pub device: String,
     pub mountPoint: String,
@@ -380,7 +380,7 @@ pub struct StoragePartition {
 }
 
 /// Contains information relative to a storage device in the system
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub struct StorageDevice {
     pub model: String,
     pub device: String,
