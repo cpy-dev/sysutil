@@ -304,7 +304,7 @@ pub struct NvmeDevice {
 
 /// Bytes size data structure implementing methods to convert in various size orders
 /// The methods allow the convertion in the various size orders, both in base 1000 and base 1024
-/// ```rust
+/// ```ignore
 /// let byteSize = /* some sysutil function returning ByteSize */ ;
 /// byteSize.b(); // bytes
 ///
@@ -611,7 +611,7 @@ fn getRate() -> (usize, usize) {
                 let mut data = Vec::<usize>::new();
                 for chunk in tmp {
                     if !chunk.is_empty() && !chunk.contains(' ') {
-                        data.push(chunk.parse().unwrap());
+                        data.push(chunk.parse().unwrap_or(0));
                     }
                 }
                 data
@@ -1433,6 +1433,36 @@ pub fn cpuFrequency() -> CpuFrequency {
     }
 }
 
+/// Holds information about backlight
+#[derive(Debug, Clone)]
+pub struct Backlight {
+    pub brightness: u32,
+    pub maxBrightness: u32
+}
+
+/// Returns the current backlight brightness and the maximum possible value or `None` if it's not possible to retrieve data
+pub fn getBacklight() -> Option<Backlight> {
+    let mut dirs = fs::read_dir("/sys/class/backlight").ok()?;
+    let path = dirs.find(|entry| {
+        let entry = entry.as_ref().unwrap().path();
+        if entry.join("brightness").exists() && entry.join("max_brightness").exists() {
+            return true;
+        } 
+
+        false
+    })?.ok()?;
+
+    let brightness = fs::read_to_string(path.path().join("brightness")).ok()?.trim().parse::<u32>().ok()?; 
+    let maxBrightness = fs::read_to_string(path.path().join("max_brightness")).ok()?.trim().parse::<u32>().ok()?;
+
+    Some(
+        Backlight {
+            brightness,
+            maxBrightness,
+        }
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1469,6 +1499,7 @@ mod tests {
         println!("{:?}", nvmeDevices());
         println!("{:?}", storageDevices());
 
+        println!("{:?}", getBacklight());
         assert_eq!(0_u8, 0_u8);
     }
 }
