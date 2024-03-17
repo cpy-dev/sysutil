@@ -155,25 +155,25 @@ class ByteSize:
         return self.__bytes / 1000
 
     def mb(self):
-        return self.__bytes / 1000 / 1000
+        return self.__bytes / (1000 ** 2)
 
     def gb(self):
-        return self.__bytes / 1000 / 1000 / 1000
+        return self.__bytes / (1000 ** 3)
 
     def tb(self):
-        return self.__bytes / 1000 / 1000 / 1000 / 1000
+        return self.__bytes / (1000 ** 4)
 
     def kib(self):
         return self.__bytes / 1024
 
     def mib(self):
-        return self.__bytes / 1024 / 1024
+        return self.__bytes / (1024 ** 2)
 
     def gib(self):
-        return self.__bytes / 1024 / 1024 / 1024
+        return self.__bytes / (1024 ** 3)
 
     def tib(self):
-        return self.__bytes / 1024 / 1024 / 1024 / 1024
+        return self.__bytes / (1024 ** 4)
 
 @dataclasses.dataclass
 class StoragePartition:
@@ -222,6 +222,11 @@ class ProcessorFrequency:
 class CpuFrequency:
     average: Frequency
     processors: [ProcessorFrequency]
+
+@dataclasses.dataclass
+class Backlight:
+    brightness: int
+    maxBrightness: int
 
 def __linuxCheck():
     if not os.path.exists('/sys') or not os.path.exists('/proc'):
@@ -1068,6 +1073,28 @@ def cpuFrequency():
         processors=frequencies
     )
 
+def getBacklight():
+    baseDir = '/sys/class/backlight'
+    dirs = os.listdir(baseDir)
+    path = ''
+
+    for dir in dirs:
+        dirPath = os.path.join(baseDir, dir)
+        if os.path.exists(os.path.join(dirPath, 'brightness')) and os.path.exists(os.path.join(dirPath, 'max_brightness')):
+            path = dirPath
+            break
+
+    if not path:
+        return None
+
+    with open(os.path.join(path, 'brightness'), 'r') as file:
+        brightness = int(file.read().strip().replace(',', '.'))
+
+    with open(os.path.join(path, 'max_brightness'), 'r') as file:
+        maxBrightness = int(file.read().strip().replace(',', '.'))
+
+    return Backlight(brightness, maxBrightness)
+
 if __name__ == '__main__':
     print(cpuUsage())
     print(f'RAM usage:', ramUsage())
@@ -1096,3 +1123,4 @@ if __name__ == '__main__':
     print(gpuMetrics())
     print(storageDevices())
     print(nvmeDevices())
+    print(getBacklight())

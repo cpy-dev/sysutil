@@ -304,8 +304,8 @@ pub struct NvmeDevice {
 
 /// Bytes size data structure implementing methods to convert in various size orders
 /// The methods allow the convertion in the various size orders, both in base 1000 and base 1024
-/// ```ignore
-/// let byteSize = /* some sysutil function returning ByteSize */ ;
+/// ```rust
+/// let byteSize = /* some sysutil function returning ByteSize */;
 /// byteSize.b(); // bytes
 ///
 /// byteSize.kb(); // 1000 bytes
@@ -341,15 +341,15 @@ impl ByteSize {
     }
 
     pub fn mb(&self) -> f32 {
-        self.bytes as f32 / 1000_f32 / 1000_f32
+        self.bytes as f32 / 1000_f32.powf(2_f32)
     }
 
     pub fn gb(&self) -> f32 {
-        self.bytes as f32 / 1000_f32 / 1000_f32 / 1000_f32
+        self.bytes as f32 / 1000_f32.powf(3_f32)
     }
 
     pub fn tb(&self) -> f32 {
-        self.bytes as f32 / 1000_f32 / 1000_f32 / 1000_f32 / 1000_f32
+        self.bytes as f32 / 1000_f32.powf(4_f32)
     }
 
     pub fn kib(&self) -> f32 {
@@ -357,15 +357,15 @@ impl ByteSize {
     }
 
     pub fn mib(&self) -> f32 {
-        self.bytes as f32 / 1024_f32 / 1024_f32
+        self.bytes as f32 / 1024_f32.powf(2_f32)
     }
 
     pub fn gib(&self) -> f32 {
-        self.bytes as f32 / 1024_f32 / 1024_f32 / 1024_f32
+        self.bytes as f32 / 1024_f32.powf(3_f32)
     }
 
     pub fn tib(&self) -> f32 {
-        self.bytes as f32 / 1024_f32 / 1024_f32 / 1024_f32 / 1024_f32
+        self.bytes as f32 / 1024_f32.powf(4_f32)
     }
 }
 
@@ -386,6 +386,13 @@ pub struct StorageDevice {
     pub device: String,
     pub size: ByteSize,
     pub partitions: Vec<StoragePartition>
+}
+
+/// Holds information about backlight
+#[derive(Debug, Clone)]
+pub struct Backlight {
+    pub brightness: u32,
+    pub maxBrightness: u32
 }
 
 fn linuxCheck() {
@@ -464,7 +471,7 @@ fn getStats() -> Vec<Vec<usize>> {
 
     let fileContent = readFile("/proc/stat");
 
-    let lines = fileContent.split('\n');
+    let lines = fileContent.split("\n");
     let mut strLines = Vec::<String>::new();
 
     for currentLine in lines {
@@ -574,7 +581,7 @@ pub fn ramUsage() -> f32 {
 
     let uMemTotal = {
         let mut total = 0_usize;
-        for element in memTotal.split(' ') {
+        for element in memTotal.split(" ") {
             if element != "MemTotal:" && !element.is_empty() {
                 total = element.parse::<usize>().unwrap();
                 break;
@@ -585,7 +592,7 @@ pub fn ramUsage() -> f32 {
 
     let uMemAvailable = {
         let mut available = 0_usize;
-        for element in memAvailable.split(' ') {
+        for element in memAvailable.split(" ") {
             if element != "MemAvailable:" && !element.is_empty() {
                 available = element.parse::<usize>().unwrap();
                 break;
@@ -606,7 +613,7 @@ fn getRate() -> (usize, usize) {
     for line in stats.split('\n') {
         if line.contains(':') {
             let splitted = {
-                let tmp = line.split(' ');
+                let tmp = line.split(" ");
 
                 let mut data = Vec::<usize>::new();
                 for chunk in tmp {
@@ -677,9 +684,9 @@ pub fn cpuInfo() -> CpuInfo {
     let infoFile = readFile("/proc/cpuinfo");
     let modelName = {
         let mut name = String::new();
-        for line in infoFile.split('\n') {
+        for line in infoFile.split("\n") {
             if line.contains("model name") {
-                name = line.split(':').last().unwrap().to_string();
+                name = line.split(":").last().unwrap().to_string();
                 break;
             }
         }
@@ -695,7 +702,7 @@ pub fn cpuInfo() -> CpuInfo {
         let processorPath = processor.unwrap().path();
         let path = processorPath.to_str().unwrap();
 
-        if path.contains("cpu") && !path.contains("cpufreq") && path.contains("cpuidle") 
+        if path.contains("cpu") && !path.contains("cpufreq") && path.contains("cpuidle")
         {
             let coreId = readFile(format!("{path}/topology/core_id").as_str());
             let dieId = readFile(format!("{path}/topology/die_id").as_str());
@@ -757,7 +764,7 @@ pub fn cpuInfo() -> CpuInfo {
                 }
             }
 
-            for governor in localGovernors.split(' ') {
+            for governor in localGovernors.split(" ") {
                 if !governors.contains(&governor.to_string()) {
                     governors.push(governor.to_string());
                 }
@@ -825,7 +832,7 @@ pub fn ramSize() -> RamSize {
 
     let uMemTotal = {
         let mut total = 0_usize;
-        for element in memTotal.split(' ') {
+        for element in memTotal.split(" ") {
             if element != "MemTotal:" && !element.is_empty() {
                 total = element.parse::<usize>().unwrap();
                 break;
@@ -851,7 +858,7 @@ pub fn schedulerInfo() -> Vec<SchedulerPolicy> {
         let sPath = path.to_str().unwrap();
 
         if sPath.contains("policy") {
-            let policyName = sPath.split('/').last().unwrap().to_string();
+            let policyName = sPath.split("/").last().unwrap().to_string();
 
             let scalingGovernor = readFile(format!("{sPath}/scaling_governor").as_str());
             let scalingDriver = readFile(format!("{sPath}/scaling_driver").as_str());
@@ -949,13 +956,13 @@ fn getRoutes(file: String, separator: &str, routeType: RouteType) -> Vec<Network
             continue;
         }
 
-        let splittedLine: Vec<&str> = line.trim().split(' ').collect();
-        let local: Vec<&str> = splittedLine[1].split(':').collect();
+        let splittedLine: Vec<&str> = line.trim().split(" ").collect();
+        let local: Vec<&str> = splittedLine[1].split(":").collect();
 
         let localAddress = bytesToAddress(local[0].to_string(), separator);
         let localPort = bytesToPort(local[1].to_string());
 
-        let remote: Vec<&str> = splittedLine[2].split(':').collect();
+        let remote: Vec<&str> = splittedLine[2].split(":").collect();
         let remoteAddress = bytesToAddress(remote[0].to_string(), separator);
         let remotePort = bytesToPort(remote[1].to_string());
 
@@ -1011,7 +1018,7 @@ pub fn clockSource() -> ClockSource {
     );
 
     let mut sources = Vec::<String>::new();
-    for source in availableClockSources.split(' ') {
+    for source in availableClockSources.split(" ") {
         sources.push(String::from(source));
     }
 
@@ -1211,28 +1218,30 @@ pub fn nvmeDevices() -> Vec<NvmeDevice> {
 
         let linkSpeed = {
             let tmp = readFile(format!("{}/device/current_link_speed", path));
-            tmp.split(' ').collect::<Vec<&str>>()[0].to_string().parse::<f32>().unwrap()
+            tmp.split(" ").collect::<Vec<&str>>()[0].to_string().parse::<f32>().unwrap()
         };
         let pcieLanes: usize = readFile(format!("{}/device/current_link_width", path)).parse().unwrap();
 
         let mut size: usize = 0;
-        for partitionLine in partitions.split('\n') {
+        for partitionLine in partitions.split("\n") {
             if partitionLine.contains(&device) {
 
-                let splitted = partitionLine.split(' ');
+                let splitted = partitionLine.split(" ");
                 let collected = splitted.collect::<Vec<&str>>();
 
                 let tempSize = collected[collected.len() - 2];
                 size = tempSize.parse::<usize>().unwrap();
+                break
             }
         }
 
         let mut localPartitions = Vec::<StoragePartition>::new();
-        for mount in mountPoints.split('\n') {
+        for mount in mountPoints.split("\n") {
             if mount.contains(&device) {
-                let splitted: Vec<&str> = mount.split(' ').collect();
+
+                let splitted: Vec<&str> = mount.split(" ").collect();
                 let device = splitted.first().unwrap().to_string();
-                let deviceName: String = device.split('/').collect::<Vec<&str>>().get(2).unwrap().to_string();
+                let deviceName: String = device.split("/").collect::<Vec<&str>>().get(2).unwrap().to_string();
 
                 let mountPoint = splitted.get(1).unwrap().to_string();
                 let fileSystem = splitted.get(2).unwrap().to_string();
@@ -1240,15 +1249,15 @@ pub fn nvmeDevices() -> Vec<NvmeDevice> {
                 let mut partSize = ByteSize{bytes: 0};
                 let mut startPoint = 0;
 
-                for partition in partitions.split('\n') {
+                for partition in partitions.split("\n") {
                     if partition.contains(&deviceName) {
 
-                         partSize = ByteSize{
-                             bytes: {
-                                 let tmp = readFile(format!("/sys/class/block/{}/size", deviceName));
-                                 tmp.parse::<usize>().unwrap()
-                             }
-                         };
+                        partSize = ByteSize{
+                            bytes: {
+                                let tmp = partition.split(" ").collect::<Vec<&str>>();
+                                tmp[tmp.len() - 2].parse::<usize>().unwrap()
+                            }
+                        };
 
                         startPoint = {
                             let tmp = readFile(format!("/sys/class/block/{}/start", deviceName));
@@ -1352,9 +1361,9 @@ pub fn storageDevices() -> Vec<StorageDevice> {
             let mut mountPoint = String::new();
             let mut filesystem = String::new();
 
-            for mount in mountPoints.split('\n') {
+            for mount in mountPoints.split("\n") {
                 if mount.contains(&format!("/dev/{} ", partitionDir).to_string()) {
-                    let splittedLine: Vec<&str> = mount.split(' ').collect();
+                    let splittedLine: Vec<&str> = mount.split(" ").collect();
 
                     mountPoint = splittedLine.get(1).unwrap().to_string();
                     filesystem = splittedLine.get(2).unwrap().to_string();
@@ -1403,12 +1412,12 @@ pub fn cpuFrequency() -> CpuFrequency {
         let mut id = String::new();
         let mut freq: f32 = 0_f32;
 
-        for line in chunk.split('\n') {
+        for line in chunk.split("\n") {
             if line.contains("processor") {
-                id = line.trim().split(':').last().unwrap().trim().to_string();
+                id = line.trim().split(":").last().unwrap().trim().to_string();
 
             } else if line.contains("cpu MHz") {
-                freq = line.trim().split(':').last().unwrap().trim().parse::<f32>().unwrap();
+                freq = line.trim().split(":").last().unwrap().trim().parse::<f32>().unwrap();
             }
         }
 
@@ -1433,12 +1442,6 @@ pub fn cpuFrequency() -> CpuFrequency {
     }
 }
 
-/// Holds information about backlight
-#[derive(Debug, Clone)]
-pub struct Backlight {
-    pub brightness: u32,
-    pub maxBrightness: u32
-}
 
 /// Returns the current backlight brightness and the maximum possible value or `None` if it's not possible to retrieve data
 pub fn getBacklight() -> Option<Backlight> {
@@ -1447,12 +1450,12 @@ pub fn getBacklight() -> Option<Backlight> {
         let entry = entry.as_ref().unwrap().path();
         if entry.join("brightness").exists() && entry.join("max_brightness").exists() {
             return true;
-        } 
+        }
 
         false
     })?.ok()?;
 
-    let brightness = fs::read_to_string(path.path().join("brightness")).ok()?.trim().parse::<u32>().ok()?; 
+    let brightness = fs::read_to_string(path.path().join("brightness")).ok()?.trim().parse::<u32>().ok()?;
     let maxBrightness = fs::read_to_string(path.path().join("max_brightness")).ok()?.trim().parse::<u32>().ok()?;
 
     Some(

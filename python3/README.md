@@ -244,7 +244,7 @@ class Frequency:
 ```
 - Contains frequency value in kHz, implements conversion methods for kHz, MHz, GHz
 
-### ProcessorFrequency:
+### ProcessorFrequency
 ```python
 class ProcessorFrequency:
     processorID: str
@@ -252,13 +252,21 @@ class ProcessorFrequency:
 ```
 - Contains processor id and its frequency 
 
-### CpuFrequency:
+### CpuFrequency
 ```python
 class CpuFrequency:
     average: Frequency
     processors: [ProcessorFrequency]
 ```
 - Contains cpu frequency, both average and processor wise
+
+### Backlight
+```python
+class Backlight:
+    brightness: int
+    maxBrightness: int
+```
+- Holds information about backlight
 
 ## Functions
 ```python3
@@ -356,3 +364,8 @@ def nvmeDevices() -> [NvmeDevices]
 def storageDevices() -> [StorageDevices]
 ```
 - Returns a vector containing all storage devices (NVME excluded) in the system
+
+```python
+def getBacklight() -> Backlight
+```
+- Returns the current backlight brightness and the maximum possible value or `None` if it's not possible to retrieve data
