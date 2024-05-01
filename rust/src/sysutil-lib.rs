@@ -617,7 +617,8 @@ fn getRate() -> (usize, usize) {
 
                 let mut data = Vec::<usize>::new();
                 for chunk in tmp {
-                    if !chunk.is_empty() && !chunk.contains(' ') {
+
+                    if !chunk.is_empty() && !chunk.contains(' ') && !chunk.contains(":") {
                         data.push(chunk.parse().unwrap_or(0));
                     }
                 }
@@ -1500,9 +1501,8 @@ mod tests {
 
         println!("{:?}", gpuMetrics());
         println!("{:?}", nvmeDevices());
-        println!("{:?}", storageDevices());
 
+        println!("{:?}", storageDevices());
         println!("{:?}", getBacklight());
-        assert_eq!(0_u8, 0_u8);
     }
 }
