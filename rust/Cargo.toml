@@ -1,6 +1,6 @@
 [package]
 name = "sysutil"
-version = "0.4.3"
+version = "0.4.4"
 authors = ["ryzeon-dev"]
 edition = "2021"
 description = "Linux system utils library"
@@ -9,5 +9,7 @@ repository = "https://github.com/ryzeon-dev/sysutil"
 readme = "README.md"
 
 [lib]
-path = "src/sysutil-lib.rs"
+path = "src/lib.rs"
 
+[dependencies]
+rsjson = "0.3.6"

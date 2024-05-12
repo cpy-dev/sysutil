@@ -7,3 +7,9 @@
 /.fleet
 /python3/sysutil/pyproject.toml
 /rust/README.md.bak
+/rust/development/lib.rs
+/rust/test.json
+/rust/development/sysutil-lib.rs
+/notes.txt
+/cpp/
+/java/

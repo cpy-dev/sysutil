@@ -60,11 +60,31 @@ class SchedulerPolicy:
     maximumScalingMHz: float
 
 @dataclasses.dataclass
+class Frequency:
+    _khz: float
+
+    def khz(self):
+        return self._khz
+
+    def mhz(self):
+        return self._khz / 1000
+
+    def ghz(self):
+        return self._khz / 1000_000
+
+@dataclasses.dataclass
+class ProcessorFrequency:
+    processorID: str
+    frequency: Frequency
+
+@dataclasses.dataclass
 class CPU:
     info: CpuInfo
     averageUsage: ProcessorUsage
     perProcessorUsage: [ProcessorUsage]
     schedulerPolicies: [SchedulerPolicy]
+    averageFrequency: Frequency
+    perProcessorFrequency: [ProcessorFrequency]
 
     def __init__(self):
         self.info = cpuInfo()
@@ -74,6 +94,10 @@ class CPU:
         self.perProcessorUsage = usage.processors
 
         self.schedulerPolicies = schedulerInfo()
+
+        frequency = cpuFrequency()
+        self.averageFrequency = frequency.average
+        self.perProcessorFrequency = cpuFrequency().processors
 
 
     def update(self):
@@ -199,24 +223,6 @@ class StorageDevice:
     device: str
     size: ByteSize
     partitions: [StoragePartition]
-
-@dataclasses.dataclass
-class Frequency:
-    _khz: float
-
-    def khz(self):
-        return self._khz
-
-    def mhz(self):
-        return self._khz / 1000
-
-    def ghz(self):
-        return self._khz / 1000_000
-
-@dataclasses.dataclass
-class ProcessorFrequency:
-    processorID: str
-    frequency: Frequency
 
 @dataclasses.dataclass
 class CpuFrequency:
@@ -1095,6 +1101,164 @@ def getBacklight():
 
     return Backlight(brightness, maxBrightness)
 
+def exportJson():
+    json = {}
+
+    def processorUsageToJson(usage):
+        return {
+            'total' : usage.total,
+            'user' : usage.user,
+            'nice' : usage.nice,
+            'system' : usage.system,
+            'idle' : usage.idle,
+            'iowait' : usage.iowait,
+            'interrupt' : usage.interrupt,
+            'soft-interrupt' : usage.soft_interrupt
+        }
+
+    def schedulerPolicyToJson(sched):
+        return {
+            'scaling-governor' : sched.scalingGovernor,
+            'scaling-driver' : sched.scalingDriver,
+            'minimum-scaling-mhz' : sched.minimumScalingMHz,
+            'maximum-scaling-mhz' : sched.maximumScalingMHz
+        }
+
+    def partitionToJson(partition: StoragePartition):
+        return {
+            'device' : partition.device,
+            'mount-point' : partition.mountPoint,
+            'filesystem' : partition.filesystem,
+            'size' : partition.size,
+            'start-point' : partition.startPoint
+        }
+
+    def nvmeDeviceToJson(device: NvmeDevice):
+        return {
+            'device' : device.device,
+            'pcie-address' : device.pcieAddress,
+            'model' : device.model,
+            'link-speed-gts' : device.linkSpeedGTs,
+            'pcie-lanes' : device.pcieLanes,
+            'size' : device.size,
+            'partitions' : [partitionToJson(partition) for partition in device.partitions]
+        }
+
+    def storageDeviceToJson(device: StorageDevice):
+        return {
+            'device' : device.device,
+            'model' : device.model,
+            'size' : device.size,
+            'partitions' : [partitionToJson(partition) for partition in device.partitions]
+        }
+
+    def networkRouteToJson(device: NetworkRoute):
+        return {
+            'type' : device.routeType,
+            'local-address' : device.localAddress,
+            'local-port' : device.localPort,
+            'remote-address' : device.remoteAddress,
+            'remote-port' : device.remotePort
+        }
+
+    cpu = CPU()
+    cpuClockSource = clockSource()
+
+    json['cpu'] = {
+        'model-name' : cpu.info.modelName,
+        'cores' : cpu.info.cores,
+        'threads' : cpu.info.threads,
+        'dies' : cpu.info.dies,
+        'governors' : cpu.info.governors,
+        'max-frequency' : cpu.info.maxFrequencyMHz,
+        'clock-boost' : cpu.info.clockBoost,
+        'architecture' : cpu.info.architecture,
+        'byte-order' : cpu.info.byteOrder,
+        'usage' : processorUsageToJson(cpu.averageUsage),
+        'scheduler-policies' : {sched.name : schedulerPolicyToJson(sched) for sched in cpu.schedulerPolicies},
+        'frequency' : cpu.averageFrequency.khz(),
+        'clock-source' : {
+            'current' : cpuClockSource.current,
+            'available' : cpuClockSource.available
+        }
+    }
+
+    json['ram'] = {
+        'usage' : ramUsage(),
+        'size-gb' : ramSize().gb,
+        'size-gib' : ramSize().gib
+    }
+
+    moboInfo = motherboardInfo()
+    json['motherboard'] = {
+        'name' : moboInfo.name,
+        'vendor' : moboInfo.vendor,
+        'version' : moboInfo.version,
+        'bios' : {
+            'vendor' : moboInfo.bios.vendor,
+            'release' : moboInfo.bios.release,
+            'version' : moboInfo.bios.version,
+            'date' : moboInfo.bios.date
+        }
+    }
+
+    nvmeDevicesList = nvmeDevices()
+    json['nvme-devices'] = [nvmeDeviceToJson(device) for device in nvmeDevicesList]
+
+    storageDevicesList = storageDevices()
+    json['storage-devices'] = [storageDeviceToJson(device) for device in storageDevicesList]
+
+    battery = batteryInfo()
+    json['battery'] = {'status' : battery.status, 'capacity' : battery.capacity} if battery else None
+
+    backlight = getBacklight()
+    json['backlight'] = {
+        'brightness' : backlight.brightness, 'max-brightness' : backlight.maxBrightness
+    } if backlight else None
+
+    rate = networkRate()
+    routes = networkRoutes()
+
+    json['network'] = {
+        'rate' : {
+            'upload' : rate.upload,
+            'download' : rate.download
+        },
+        'routes' : [networkRouteToJson(route) for route in routes]
+    }
+
+    tempSensors = temperatureSensors()
+    json['temperature-sensors'] = [
+        {'label' : sensor.label, 'temperature' : sensor.temperature} for sensor in tempSensors
+    ]
+
+    json['vram-size'] = {
+        'gb' : vramSize().gb,
+        'gib' : vramSize().gib
+    }
+
+    metrics = gpuMetrics()
+    json['gpu-metrics'] = {
+        'temperature-edge' : metrics.temperatureEdge,
+        'temperature-hotspot' : metrics.temperatureHotspot,
+        'temperature-mem' : metrics.temperatureMem,
+        'temperature-vrgfx' : metrics.temperatureVrgfx,
+        'temperature-vrsoc' : metrics.temperatureVrsoc,
+        'temperature-vrmem' : metrics.temperatureVrmem,
+        'average-socket-power' : metrics.averageSocketPower,
+        'average-gfxclk-frequency' : metrics.averageGfxclkFrequency,
+        'average-sockclk-frequency' : metrics.averageSockclkFrequency,
+        'average-uclk-frequency' : metrics.averageUclkFrequency,
+        'current-gfxclk' : metrics.currentGfxclk,
+        'current-sockclk' : metrics.currentSockclk,
+        'throttle-status' : metrics.throttleStatus,
+        'current-fan-speed' : metrics.currentFanSpeed,
+        'pcie-link-width' : metrics.pcieLinkWidth,
+        'pcie-link-speed' : metrics.pcieLinkSpeed
+    }
+
+    return json
+
 if __name__ == '__main__':
     print(cpuUsage())
     print(f'RAM usage:', ramUsage())
@@ -1124,3 +1288,5 @@ if __name__ == '__main__':
     print(storageDevices())
     print(nvmeDevices())
     print(getBacklight())
+
+    print(exportJson())
