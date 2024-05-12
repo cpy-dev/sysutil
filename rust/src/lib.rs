@@ -1891,7 +1891,6 @@ pub fn exportJson() -> rsjson::Json {
                     BatteryStatus::Charging => NodeContent::String(String::from("Charging")),
                     BatteryStatus::Discharging => NodeContent::String(String::from("Discharging")),
                     BatteryStatus::Full => NodeContent::String(String::from("Full")),
-                    _ => NodeContent::Null
                 }
             ));
 
