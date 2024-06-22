@@ -1,3 +1,8 @@
+<div>
+  <img src="https://img.shields.io/badge/python3-242627?logo=python&logoColor=16a085&style=for-the-badge" href="" />
+  <img src="https://img.shields.io/badge/rust-242627?logo=rust&logoColor=16a085&style=for-the-badge" href="" />  
+</div>
+
 # sysutil-lib
 - Linux system information library
 - available for both Rust and Python
