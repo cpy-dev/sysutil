@@ -4,13 +4,13 @@ version = 3
 
 [[package]]
 name = "rsjson"
-version = "0.3.6"
+version = "0.4.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3c5a069c69be11a8a7ab3109a1199d6951613507e6c8f8c7c406c9cd11f6b76b"
+checksum = "ece6a491d4b13f068a8407c36d993d87d9ce01a1129b75ec3b2b39326e8909ac"
 
 [[package]]
 name = "sysutil"
-version = "0.4.4"
+version = "0.4.5"
 dependencies = [
  "rsjson",
 ]
