@@ -234,6 +234,12 @@ class Backlight:
     brightness: int
     maxBrightness: int
 
+@dataclasses.dataclass
+class Load:
+    oneMinute: int
+    fiveMinutes: int
+    fifteenMinutes: int
+
 def __linuxCheck():
     if not os.path.exists('/sys') or not os.path.exists('/proc'):
         raise Exception('Detected non-Linux system')
@@ -1101,6 +1107,17 @@ def getBacklight():
 
     return Backlight(brightness, maxBrightness)
 
+def getLoad():
+    with open('/proc/loadavg', 'r') as file:
+        content = file.read()
+
+    splitted = content.split(' ')
+    return Load(
+        oneMinute=splitted[0],
+        fiveMinutes=splitted[1],
+        fifteenMinutes=splitted[2]
+    )
+
 def exportJson():
     json = {}
 
@@ -1255,6 +1272,13 @@ def exportJson():
         'current-fan-speed' : metrics.currentFanSpeed,
         'pcie-link-width' : metrics.pcieLinkWidth,
         'pcie-link-speed' : metrics.pcieLinkSpeed
+    }
+
+    load = getLoad()
+    json[load] = {
+        'one-minute' : load.oneMinute,
+        'five-minutes' : load.fiveMinutes,
+        'fifteen-minutes' : load.fifteenMinutes
     }
 
     return json

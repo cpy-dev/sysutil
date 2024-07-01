@@ -10,7 +10,7 @@ checksum = "ece6a491d4b13f068a8407c36d993d87d9ce01a1129b75ec3b2b39326e8909ac"
 
 [[package]]
 name = "sysutil"
-version = "0.4.5"
+version = "0.4.6"
 dependencies = [
  "rsjson",
 ]

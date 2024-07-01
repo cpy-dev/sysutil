@@ -396,6 +396,13 @@ pub struct Backlight {
     pub maxBrightness: u32
 }
 
+/// Holds data structure for average load
+pub struct Load {
+    pub oneMinute: f32,
+    pub fiveMinutes: f32,
+    pub fifteenMinutes: f32
+}
+
 fn linuxCheck() {
     if !path::Path::new("/sys").exists() || !path::Path::new("/proc").exists() {
         panic!("Detected non-Linux system");
@@ -1468,6 +1475,18 @@ pub fn getBacklight() -> Option<Backlight> {
     )
 }
 
+/// Returns the average load for the last one, five and fifteen minutes
+pub fn getLoad() -> Load {
+    let fileContent = readFile("/proc/loadavg");
+    let binding = fileContent.split(" ").collect::<Vec<&str>>();
+
+    Load {
+        oneMinute: binding.get(0).unwrap().parse::<f32>().unwrap(),
+        fiveMinutes: binding.get(1).unwrap().parse::<f32>().unwrap(),
+        fifteenMinutes: binding.get(2).unwrap().parse::<f32>().unwrap()
+    }
+}
+
 pub fn exportJson() -> rsjson::Json {
     let mut json = rsjson::Json::new();
 
@@ -2143,6 +2162,25 @@ pub fn exportJson() -> rsjson::Json {
             ));
         }
     }
+
+    let load = getLoad();
+
+    let mut loadNodeContent = Json::new();
+    loadNodeContent.addNode(Node::new(
+        "one-minute", NodeContent::Float(load.oneMinute)
+    ));
+
+    loadNodeContent.addNode(Node::new(
+        "five-minutes", NodeContent::Float(load.fiveMinutes)
+    ));
+
+    loadNodeContent.addNode(Node::new(
+        "fifteen-minutes", NodeContent::Float(load.fifteenMinutes)
+    ));
+
+    json.addNode(Node::new(
+        "load", NodeContent::Json(loadNodeContent)
+    ));
 
     return json
 }
