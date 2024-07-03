@@ -403,6 +403,12 @@ pub struct Load {
     pub fifteenMinutes: f32
 }
 
+#[derive(Debug)]
+pub struct IPv4 {
+    pub address: String,
+    pub interface: String
+}
+
 fn linuxCheck() {
     if !path::Path::new("/sys").exists() || !path::Path::new("/proc").exists() {
         panic!("Detected non-Linux system");
@@ -1487,6 +1493,59 @@ pub fn getLoad() -> Load {
     }
 }
 
+/// Returns the various ip addresses associated to the various network interfaces in the device
+fn getIPv4() -> Vec<IPv4> {
+    let mut ipv4Addresses = Vec::<IPv4>::new();
+    let mut addresses = Vec::<String>::new();
+
+    let routeFile = readFile("/proc/net/route");
+    let fibTrie = readFile("/proc/net/fib_trie");
+
+    for line in fibTrie.split("|--") {
+        let chunks = line.split("\n").collect::<Vec<&str>>();
+
+        let address = chunks.get(0).unwrap().trim().to_string();
+        let addressType = chunks.get(1).unwrap().trim().to_string();
+
+        if addressType.contains("/32 host LOCAL") && !addresses.contains(&address) {
+            addresses.push(address);
+        }
+    }
+
+    for line in routeFile.split("\n") {
+        if line.is_empty() ||  line.contains("Gateway") {
+            continue
+        }
+
+        let splittedLine = line.split("\t").collect::<Vec<&str>>();
+        let device = splittedLine.first().unwrap().trim().to_string();
+
+        let network = bytesToAddress(splittedLine.get(1).unwrap().trim().to_string(), ".");
+        let mut ip = String::new();
+
+        for address in &addresses {
+            let addressNetwork = {
+                let mut binding = address.split(".").collect::<Vec<&str>>();
+                binding[3] = "0";
+                binding.join(".")
+            };
+
+            if &network == &addressNetwork {
+                ip = address.to_string();
+            }
+        }
+
+        if !ip.is_empty() {
+            ipv4Addresses.push(IPv4{
+                address: ip,
+                interface: device
+            });
+        }
+    }
+
+    return ipv4Addresses;
+}
+
 pub fn exportJson() -> rsjson::Json {
     let mut json = rsjson::Json::new();
 
@@ -2182,6 +2241,28 @@ pub fn exportJson() -> rsjson::Json {
         "load", NodeContent::Json(loadNodeContent)
     ));
 
+    let mut ipv4NodeContent = Vec::<NodeContent>::new();
+    for ipv4 in getIPv4() {
+        let mut ipNode = rsjson::Json::new();
+
+        ipNode.addNode(Node::new(
+            "address",
+            NodeContent::String(ipv4.address)
+        ));
+
+        ipNode.addNode(Node::new(
+            "interface",
+            NodeContent::String(ipv4.interface)
+        ));
+
+        ipv4NodeContent.push(NodeContent::Json(ipNode));
+    }
+
+    json.addNode(Node::new(
+        "ipv4",
+        NodeContent::List(ipv4NodeContent)
+    ));
+
     return json
 }
 
@@ -2227,6 +2308,8 @@ mod tests {
 
         println!("{:?}", json);
         json.writeToFile("test.json");
+
+        //println!("{:?}", getIPv4());
         assert_eq!(0_u8, 0_u8);
     }
 }

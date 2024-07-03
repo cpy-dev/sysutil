@@ -240,6 +240,11 @@ class Load:
     fiveMinutes: int
     fifteenMinutes: int
 
+@dataclasses.dataclass
+class IPv4:
+    address: str
+    interface: str
+
 def __linuxCheck():
     if not os.path.exists('/sys') or not os.path.exists('/proc'):
         raise Exception('Detected non-Linux system')
@@ -1118,6 +1123,48 @@ def getLoad():
         fifteenMinutes=splitted[2]
     )
 
+def getIPv4():
+    ipv4Addresses = []
+
+    interfaces = []
+    addresses = []
+
+    routes = __readFile("/proc/net/route")
+    fibTrie = __readFile("/proc/net/fib_trie")
+
+    for line in fibTrie.split('|--'):
+        chunks = line.split("\n")
+
+        address = chunks[0]
+        addressType = chunks[1]
+
+        if '/32 host LOCAL' in addressType and address not in addresses:
+            addresses.append(address)
+
+    for line in routes.split('\n'):
+        if not line or 'Gateway' in line:
+            continue
+
+        splittedLine = line.split('\t')
+        device = splittedLine[0].strip()
+
+        network = __bytesToAddress(splittedLine[1], '.')
+        ip = None
+
+        for address in addresses:
+            addressNetwork = address.strip().split('.')
+
+            addressNetwork[3] = '0'
+            addressNetwork = '.'.join(addressNetwork)
+
+            if network == addressNetwork:
+                ip = address
+
+        if ip is not None:
+            ipv4Addresses.append(IPv4(address=ip.strip(), interface=device.strip()))
+
+    return ipv4Addresses
+
 def exportJson():
     json = {}
 
@@ -1275,11 +1322,16 @@ def exportJson():
     }
 
     load = getLoad()
-    json[load] = {
+    json['load'] = {
         'one-minute' : load.oneMinute,
         'five-minutes' : load.fiveMinutes,
         'fifteen-minutes' : load.fifteenMinutes
     }
+
+    ipv4Addresses = getIPv4()
+    json['ipv4'] = [
+        {'address' : address.address, 'interface' : address.interface} for address in ipv4Addresses
+    ]
 
     return json
 
@@ -1310,7 +1362,11 @@ if __name__ == '__main__':
 
     print(gpuMetrics())
     print(storageDevices())
+
     print(nvmeDevices())
     print(getBacklight())
+
+    print(getLoad())
+    print(getIPv4())
 
     print(exportJson())
