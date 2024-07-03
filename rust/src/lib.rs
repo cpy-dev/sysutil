@@ -1494,7 +1494,7 @@ pub fn getLoad() -> Load {
 }
 
 /// Returns the various ip addresses associated to the various network interfaces in the device
-fn getIPv4() -> Vec<IPv4> {
+pub fn getIPv4() -> Vec<IPv4> {
     let mut ipv4Addresses = Vec::<IPv4>::new();
     let mut addresses = Vec::<String>::new();
 
