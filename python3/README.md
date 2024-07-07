@@ -268,6 +268,26 @@ class Backlight:
 ```
 - Holds information about backlight
 
+### Load
+```python
+class Load:
+    oneMinute: int
+    fiveMinutes: int
+    fifteenMinutes: int
+```
+- holds load values 
+
+### IPv4
+```python
+class IPv4:
+    address: str
+    interface: str
+    broadcast: str
+    cidr: int
+    netmask: str
+```
+- contains the various parameters for an IPv4 address in the system
+
 ## Functions
 ```python3
 def cpuUsage() -> CpuUsage
@@ -369,3 +389,19 @@ def storageDevices() -> [StorageDevices]
 def getBacklight() -> Backlight
 ```
 - Returns the current backlight brightness and the maximum possible value or `None` if it's not possible to retrieve data
+
+```python
+def getLoad() -> Load 
+```
+- returns the load for the past one, five and fifteen minutes 
+
+```python
+def getIPv4() -> [IPv4]
+```
+- returns a list of `IPv4` object; each one is related to an IPv4 address in the system
+
+
+```python
+def exportJson() -> dict
+```
+- returns a `dict` containing all the information which `sysutil` can provide 

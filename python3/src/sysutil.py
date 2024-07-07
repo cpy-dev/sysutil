@@ -244,6 +244,9 @@ class Load:
 class IPv4:
     address: str
     interface: str
+    broadcast: str
+    cidr: int
+    netmask: str
 
 def __linuxCheck():
     if not os.path.exists('/sys') or not os.path.exists('/proc'):
@@ -1123,6 +1126,39 @@ def getLoad():
         fifteenMinutes=splitted[2]
     )
 
+def __containsAddress(addresses, address):
+    for addr, broadcast, netmask, cidr in addresses:
+        if addr == address:
+            return True
+    return False
+
+def __bitsToByte(bits):
+    reversed = bits[::-1]
+    byte = 0
+
+    for index, bit in enumerate(reversed):
+        byte += bit * (2 ** index)
+
+    return byte
+
+def __netmaskFromCidr(cidr):
+    bits = []
+
+    for i in range(32):
+        if i < int(cidr):
+            bits.append(1)
+
+        else:
+            bits.append(0)
+
+    mask = []
+    i = 0
+    while i < 32:
+        mask.append(__bitsToByte(bits[i:i+8]))
+        i += 8
+
+    return f'{mask[0]}.{mask[1]}.{mask[2]}.{mask[3]}'
+
 def getIPv4():
     ipv4Addresses = []
 
@@ -1132,14 +1168,24 @@ def getIPv4():
     routes = __readFile("/proc/net/route")
     fibTrie = __readFile("/proc/net/fib_trie")
 
-    for line in fibTrie.split('|--'):
-        chunks = line.split("\n")
+    index = 0
+    lines = fibTrie.split('|--')
 
-        address = chunks[0]
-        addressType = chunks[1]
+    while index < len(lines):
+        line = lines[index]
+        chunks = line.split('\n')
 
-        if '/32 host LOCAL' in addressType and address not in addresses:
-            addresses.append(address)
+        address = chunks[0].strip()
+        addressType = chunks[1].strip()
+
+        if '/32 host LOCAL' in addressType and not __containsAddress(addresses, address):
+            broadcast = lines[index+1].split('\n')[0].strip()
+            cidr = lines[index-1].split('\n')[1].strip().split(' ')[0].replace('/', '').strip()
+
+            mask = __netmaskFromCidr(cidr)
+            addresses.append((address, broadcast, cidr, mask))
+
+        index += 1
 
     for line in routes.split('\n'):
         if not line or 'Gateway' in line:
@@ -1150,8 +1196,12 @@ def getIPv4():
 
         network = __bytesToAddress(splittedLine[1], '.')
         ip = None
+        brd = None
 
-        for address in addresses:
+        mask = None
+        cidr = None
+
+        for address, broadcast, cidrAddr, netmask in addresses:
             addressNetwork = address.strip().split('.')
 
             addressNetwork[3] = '0'
@@ -1159,9 +1209,19 @@ def getIPv4():
 
             if network == addressNetwork:
                 ip = address
+                brd = broadcast
+                cidr = cidrAddr
+                mask = netmask
 
         if ip is not None:
-            ipv4Addresses.append(IPv4(address=ip.strip(), interface=device.strip()))
+            ipv4Addresses.append(
+                IPv4(
+                    address=ip.strip(),
+                    interface=device,
+                    broadcast=brd,
+                    cidr=cidr,
+                    netmask=mask
+                ))
 
     return ipv4Addresses
 
@@ -1330,7 +1390,13 @@ def exportJson():
 
     ipv4Addresses = getIPv4()
     json['ipv4'] = [
-        {'address' : address.address, 'interface' : address.interface} for address in ipv4Addresses
+        {
+            'address' : address.address,
+            'interface' : address.interface,
+            'broadcast' : address.broadcast,
+            'cidr' : address.cidr,
+            'netmask' : address.netmask
+        } for address in ipv4Addresses
     ]
 
     return json

@@ -23,7 +23,7 @@
 #![allow(dead_code)]
 #![allow(non_camel_case_types)]
 
-use std::fs;
+use std::{fmt, fs};
 use std::io::Read;
 use std::path;
 use std::process::Command;
@@ -406,7 +406,22 @@ pub struct Load {
 #[derive(Debug)]
 pub struct IPv4 {
     pub address: String,
-    pub interface: String
+    pub interface: String,
+    pub broadcast: String,
+    pub netmask: String,
+    pub cidr: String
+}
+
+impl fmt::Display for IPv4 {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}/{}", self.address, self.cidr)
+    }
+}
+
+impl IPv4 {
+    pub fn to_string(&self) -> String {
+        format!("{}/{}", self.address, self.cidr)
+    }
 }
 
 fn linuxCheck() {
@@ -693,7 +708,8 @@ pub fn temperatureSensors() -> Vec<TemperatureSensor> {
 }
 
 /// Returns CPU base information, enclosed in the `CpuInfo` data structure
-pub fn cpuInfo() -> CpuInfo {
+
+fn cpuInfo() -> CpuInfo {
     linuxCheck();
 
     let infoFile = readFile("/proc/cpuinfo");
@@ -717,7 +733,7 @@ pub fn cpuInfo() -> CpuInfo {
         let processorPath = processor.unwrap().path();
         let path = processorPath.to_str().unwrap();
 
-        if path.contains("cpu") && !path.contains("cpufreq") && path.contains("cpuidle")
+        if path.contains("cpu") && !path.contains("cpufreq") && !path.contains("cpuidle")
         {
             let coreId = readFile(format!("{path}/topology/core_id").as_str());
             let dieId = readFile(format!("{path}/topology/die_id").as_str());
@@ -836,7 +852,6 @@ pub fn ramSize() -> RamSize {
     linuxCheck();
 
     let content = readFile("/proc/meminfo");
-
     let mut memTotal = "";
 
     for element in content.split('\n') {
@@ -1457,7 +1472,6 @@ pub fn cpuFrequency() -> CpuFrequency {
     }
 }
 
-
 /// Returns the current backlight brightness and the maximum possible value or `None` if it's not possible to retrieve data
 pub fn getBacklight() -> Option<Backlight> {
     let mut dirs = fs::read_dir("/sys/class/backlight").ok()?;
@@ -1493,23 +1507,116 @@ pub fn getLoad() -> Load {
     }
 }
 
+fn makeNetmask(ip: &String, broadcast: &String) -> String {
+    let splittedIp = {
+        let binding = ip.split(".").collect::<Vec<&str>>();
+        let mut bytesIp = Vec::<u8>::new();
+
+        for chunk in binding {
+            bytesIp.push(chunk.parse::<u8>().unwrap());
+        }
+
+        bytesIp
+    };
+
+    let splittedBrd = {
+        let binding = broadcast.split(".").collect::<Vec<&str>>();
+        let mut bytesIp = Vec::<u8>::new();
+
+        for chunk in binding {
+            bytesIp.push(chunk.parse::<u8>().unwrap());
+        }
+
+        bytesIp
+    };
+
+    let mut mask = Vec::<u8>::new();
+    for i in 0..4 {
+        let ipByte = splittedIp.get(i).unwrap().to_owned();
+
+        let brdByte = splittedBrd.get(i).unwrap().to_owned();
+        mask.push(!ipByte | (ipByte & !brdByte));
+    }
+
+    format!(
+        "{}.{}.{}.{}", mask.get(0).unwrap(), mask.get(1).unwrap(),
+        mask.get(2).unwrap(), mask.get(3).unwrap()
+    )
+}
+
+fn bitsToByte(bits: &mut Vec<u8>) -> u8{
+    bits.reverse();
+    let mut byte: u8 = 0;
+
+    for i in 0..8 {
+        byte += bits[i] * 2_i32.pow(i as u32) as u8;
+    }
+    return byte;
+}
+
+fn netmaskFromCidr(cidr: u8) -> String {
+    let mut bits = Vec::<u8>::new();
+
+    for i in 0..32 {
+        if i < cidr {
+            bits.push(1);
+        } else {
+            bits.push(0);
+        }
+    }
+
+    let mut mask = Vec::<u8>::new();
+    let mut i: usize = 0;
+
+    while i < 32 {
+        mask.push(bitsToByte(&mut bits.get_mut(i..i+8).unwrap().to_vec()));
+        i += 8;
+    }
+
+    return format!("{}.{}.{}.{}", mask[0], mask[1], mask[2], mask[3]);
+    
+}
+
 /// Returns the various ip addresses associated to the various network interfaces in the device
 pub fn getIPv4() -> Vec<IPv4> {
     let mut ipv4Addresses = Vec::<IPv4>::new();
-    let mut addresses = Vec::<String>::new();
+    let mut addresses = Vec::<(String, String, String, String)>::new();
 
     let routeFile = readFile("/proc/net/route");
     let fibTrie = readFile("/proc/net/fib_trie");
 
-    for line in fibTrie.split("|--") {
+    let mut index: usize = 0;
+    let lines = fibTrie.split("|--").collect::<Vec<&str>>();
+
+    while index < lines.len() {
+        let line = lines.get(index).unwrap().to_string();
         let chunks = line.split("\n").collect::<Vec<&str>>();
 
         let address = chunks.get(0).unwrap().trim().to_string();
         let addressType = chunks.get(1).unwrap().trim().to_string();
 
-        if addressType.contains("/32 host LOCAL") && !addresses.contains(&address) {
-            addresses.push(address);
+        if addressType.contains("/32 host LOCAL") && addresses.iter().find(|x| &x.0 == &address) == None {
+            let broadcast = {
+                let binding = lines.get(index+1).unwrap().to_string();
+
+                let splitted = binding.split("\n").collect::<Vec<&str>>(); //.trim()
+                splitted.get(0).unwrap().trim().to_string()
+            };
+
+            let binding = lines.get(index-1).unwrap().to_string();
+            let splitted = binding.split("\n").collect::<Vec<&str>>();
+
+            let cidrBinding = splitted.get(1).unwrap().trim().to_string();
+            let splittedCidr = cidrBinding.split(" ").collect::<Vec<&str>>();
+
+            let cidr = splittedCidr.get(0).unwrap().to_string().replace("/", "").to_string();
+
+            let netmask = netmaskFromCidr(cidr.parse::<u8>().unwrap());
+
+            addresses.push((address, broadcast, netmask, cidr));
+
         }
+        index += 1;
     }
 
     for line in routeFile.split("\n") {
@@ -1519,26 +1626,39 @@ pub fn getIPv4() -> Vec<IPv4> {
 
         let splittedLine = line.split("\t").collect::<Vec<&str>>();
         let device = splittedLine.first().unwrap().trim().to_string();
-
         let network = bytesToAddress(splittedLine.get(1).unwrap().trim().to_string(), ".");
-        let mut ip = String::new();
 
-        for address in &addresses {
+        let mut ip = String::new();
+        let mut brd = String::new();
+
+        let mut mask = String::new();
+        let mut cidr = String::new();
+
+
+        for (address, broadcast, netmask, cidrMask) in &addresses {
             let addressNetwork = {
                 let mut binding = address.split(".").collect::<Vec<&str>>();
+
                 binding[3] = "0";
                 binding.join(".")
             };
 
             if &network == &addressNetwork {
+                brd = broadcast.to_string();
                 ip = address.to_string();
+
+                mask = netmask.to_string();
+                cidr = cidrMask.to_string();
             }
         }
 
         if !ip.is_empty() {
-            ipv4Addresses.push(IPv4{
+            ipv4Addresses.push(IPv4 {
                 address: ip,
-                interface: device
+                interface: device,
+                broadcast: brd,
+                netmask: mask,
+                cidr: cidr
             });
         }
     }
@@ -2304,12 +2424,16 @@ mod tests {
 
         println!("{:?}", getBacklight());*/
 
-        let json = exportJson();
+        /*let json = exportJson();
 
         println!("{:?}", json);
-        json.writeToFile("test.json");
+        json.writeToFile("test.json");*/
 
-        //println!("{:?}", getIPv4());
+        let ips = getIPv4();
+        println!("{:?}", ramSize());
+
+        println!("{:?}", ips.get(0).unwrap());
+        //println!("{:?}", cpuInfo());
         assert_eq!(0_u8, 0_u8);
     }
 }
