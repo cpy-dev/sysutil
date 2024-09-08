@@ -112,6 +112,23 @@ class RouteType:
     UDP6 = 'udp6'
 ```
 
+### RouteStatus
+```python3
+class RouteStatus:
+    ESTABLISHED = 'established'
+    SYN_SENT = 'syn sent'
+    SYN_RECEIVED = 'syn received'
+    FIN_WAIT1 = 'fin wait 1'
+    FIN_WAIT2 = 'fin wait 2'
+    TIME_WAIT = 'time wait'
+    CLOSED = 'closed'
+    CLOSE_WAIT = 'close wait'
+    LAST_ACKNOWLEDGEMENT = 'last acknowledgement'
+    LISTENING = 'listening'
+    CLOSING = 'closing'
+    NEW_SYN_RECEIVED = 'new syn received'
+```
+
 ### NetworkRoute
 ```python3
 class NetworkRoute:
@@ -120,6 +137,7 @@ class NetworkRoute:
     localPort: int
     remoteAddress: str
     remotePort: int
+    routeStatus: str 
 ```
 - represents a network route
 
@@ -288,6 +306,27 @@ class IPv4:
 ```
 - contains the various parameters for an IPv4 address in the system
 
+### BusInput
+```python3
+class BusInput:
+    bus: int
+    vendor: int
+    product: int
+    version: int
+    name: str
+    physicalPath: str
+    sysfsPath: str
+    uniqueIdentifier: str
+    handles: [str]
+    properties: int
+    events: int
+    keys: [str]
+    miscellaneousEvents: int
+    led: int
+```
+- contains the information regarding a bus input
+
+
 ## Functions
 ```python3
 def cpuUsage() -> CpuUsage
@@ -400,6 +439,10 @@ def getIPv4() -> [IPv4]
 ```
 - returns a list of `IPv4` object; each one is related to an IPv4 address in the system
 
+```python 
+def busInput() -> [BusInput]
+```
+- returns a list of `BusInput` objects, representing the bus inputs found in procfs
 
 ```python
 def exportJson() -> dict

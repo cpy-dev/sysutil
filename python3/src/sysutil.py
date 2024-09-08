@@ -122,6 +122,58 @@ class RouteType:
     UDP = 'udp'
     UDP6 = 'udp6'
 
+class RouteStatus:
+    ESTABLISHED = 'established'
+    SYN_SENT = 'syn sent'
+    SYN_RECEIVED = 'syn received'
+    FIN_WAIT1 = 'fin wait 1'
+    FIN_WAIT2 = 'fin wait 2'
+    TIME_WAIT = 'time wait'
+    CLOSED = 'closed'
+    CLOSE_WAIT = 'close wait'
+    LAST_ACKNOWLEDGEMENT = 'last acknowledgement'
+    LISTENING = 'listening'
+    CLOSING = 'closing'
+    NEW_SYN_RECEIVED = 'new syn received'
+
+    @staticmethod
+    def fromTcpCode(code):
+        if code == '01':
+            return RouteStatus.ESTABLISHED
+
+        elif code == '02':
+            return RouteStatus.SYN_SENT
+
+        elif code == '03':
+            return RouteStatus.SYN_RECEIVED
+
+        elif code == '04':
+            return RouteStatus.FIN_WAIT1
+
+        elif code == '05':
+            return RouteStatus.FIN_WAIT2
+
+        elif code == '06':
+            return RouteStatus.TIME_WAIT
+
+        elif code == '07':
+            return RouteStatus.CLOSED
+
+        elif code == '08':
+            return RouteStatus.CLOSE_WAIT
+
+        elif code == '09':
+            return RouteStatus.LAST_ACKNOWLEDGEMENT
+
+        elif code == '0A':
+            return RouteStatus.LISTENING
+
+        elif code == '0B':
+            return RouteStatus.CLOSING
+
+        elif code == '0C':
+            return RouteStatus.NEW_SYN_RECEIVED
+
 @dataclasses.dataclass
 class NetworkRoute:
     routeType: str
@@ -129,6 +181,7 @@ class NetworkRoute:
     localPort: int
     remoteAddress: str
     remotePort: int
+    routeStatus: str
 
 @dataclasses.dataclass
 class ClockSource:
@@ -247,6 +300,23 @@ class IPv4:
     broadcast: str
     cidr: int
     netmask: str
+
+@dataclasses.dataclass
+class BusInput:
+    bus: int
+    vendor: int
+    product: int
+    version: int
+    name: str
+    physicalPath: str
+    sysfsPath: str
+    uniqueIdentifier: str
+    handles: [str]
+    properties: int
+    events: int
+    keys: [str]
+    miscellaneousEvents: int
+    led: int
 
 def __linuxCheck():
     if not os.path.exists('/sys') or not os.path.exists('/proc'):
@@ -712,13 +782,21 @@ def __getRoutes(filePath, separator, routeType):
         remoteAddress = __bytesToAddress(remote[0], separator)
         remotePort = __bytesToPort(remote[1])
 
+        statusCode = splittedLine[3]
+        if routeType in (RouteType.TCP, RouteType.TCP6):
+            status = RouteStatus.fromTcpCode(statusCode)
+
+        else:
+            status = RouteStatus.LISTENING
+
         routes.append(
             NetworkRoute (
                 routeType=routeType,
                 localAddress=localAddress,
                 localPort=localPort,
                 remoteAddress=remoteAddress,
-                remotePort=remotePort
+                remotePort=remotePort,
+                routeStatus=status
             )
         )
 
@@ -1225,6 +1303,103 @@ def getIPv4():
 
     return ipv4Addresses
 
+def busInput():
+    inputs = []
+
+    with open('/proc/bus/input/devices', 'r') as file:
+        fileContent = file.read()
+
+    for chunk in fileContent.split('\n\n'):
+        if not chunk.strip():
+            continue
+
+        bus = None
+        vwndor = None
+        version = None
+        product = None
+        name = None
+        physicalPath = None
+        sysfsPath = None
+        uniqueIdentifier = None
+        handlees = []
+        properties = None
+        events = None
+        miscellaneousEvents = None
+        led = None
+        keys = []
+
+        for line in chunk.strip().split('\n'):
+
+            if 'I: ' in line:
+                for block in line.strip().split(' '):
+                    if 'Bus=' in block:
+                        bus = int(block.replace('Bus=', ''), 16)
+
+                    elif 'Vendor=' in block:
+                        vendor = int(block.replace('Vendor=', ''), 16)
+
+                    elif 'Version=' in block:
+                        version = int(block.replace('Version=', ''), 16)
+
+                    elif 'Product=' in block:
+                        product = int(block.replace('Product=', ''), 16)
+
+            elif (target := 'N: Name=') in line:
+                name = line.replace(target, '').replace('"', '')
+
+            elif (target := 'P: Phys=') in line:
+                physicalPath = line.replace(target, '')
+
+            elif (target := 'S: Sysfs=') in line:
+                sysfsPath = line.replace(target, '')
+
+            elif (target := 'U: Uniq=') in line:
+                uniqueIdentifier = line.replace(target, '')
+
+            elif (target := 'H: Handlers=') in line:
+                handlersList = line.replace(target, '').split(' ')
+                handles = []
+
+                for handler in handlersList:
+                    handles.append(handler)
+
+            elif (target := 'B: PROP=') in line:
+                properties = int(line.replace(target, ''), 16)
+
+            elif (target := 'B: EV=') in line:
+                events = int(line.replace(target, ''), 16)
+
+            elif (target := 'B: MSC=') in line:
+                miscellaneousEvents = int(line.replace(target, ''), 16)
+
+            elif (target := 'B: LED=') in line:
+                led = int(line.replace(target, ''), 16)
+
+            elif (target := 'B: KEY=') in line:
+                keys = []
+
+                for key in line.replace(target, '').split(' '):
+                    keys.append(key)
+
+        inputs.append(BusInput(
+            bus=bus,
+            vendor=vendor,
+            product=product,
+            version=version,
+            name=name,
+            physicalPath=physicalPath,
+            sysfsPath=sysfsPath,
+            uniqueIdentifier=uniqueIdentifier,
+            handles=handles,
+            properties=properties,
+            events=events,
+            keys=keys,
+            miscellaneousEvents=miscellaneousEvents,
+            led=led
+        ))
+
+    return inputs
+
 def exportJson():
     json = {}
 
@@ -1276,13 +1451,14 @@ def exportJson():
             'partitions' : [partitionToJson(partition) for partition in device.partitions]
         }
 
-    def networkRouteToJson(device: NetworkRoute):
+    def networkRouteToJson(route: NetworkRoute):
         return {
-            'type' : device.routeType,
-            'local-address' : device.localAddress,
-            'local-port' : device.localPort,
-            'remote-address' : device.remoteAddress,
-            'remote-port' : device.remotePort
+            'type' : route.routeType,
+            'local-address' : route.localAddress,
+            'local-port' : route.localPort,
+            'remote-address' : route.remoteAddress,
+            'remote-port' : route.remotePort,
+            'status' : route.routeStatus
         }
 
     cpu = CPU()
@@ -1399,6 +1575,27 @@ def exportJson():
         } for address in ipv4Addresses
     ]
 
+    busInputs = busInput()
+    json['bus-input'] = []
+    for bus in busInputs:
+        json['bus-input'].append(
+            {
+                'bus' : bus.bus,
+                'vendor' : bus.vendor,
+                'product' : bus.product,
+                'version' : bus.version,
+                'physical-path' : bus.physicalPath,
+                'sysfs-path' : bus.sysfsPath,
+                'name' : bus.name,
+                'handles' : bus.handles,
+                'properties' : bus.properties,
+                'events' : bus.events,
+                'keys' : bus.keys,
+                'miscellaneous-events' : bus.miscellaneousEvents,
+                'led' : bus.led
+            }
+        )
+
     return json
 
 if __name__ == '__main__':
@@ -1435,4 +1632,5 @@ if __name__ == '__main__':
     print(getLoad())
     print(getIPv4())
 
+    print(busInput())
     print(exportJson())

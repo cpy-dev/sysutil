@@ -24,6 +24,8 @@
 #![allow(non_camel_case_types)]
 
 use std::{fmt, fs};
+use std::cmp::PartialEq;
+use std::collections::HashMap;
 use std::io::Read;
 use std::path;
 use std::process::Command;
@@ -227,7 +229,7 @@ pub struct VramSize {
 }
 
 /// Different route types
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum RouteType {
     TCP,
     TCP6,
@@ -235,14 +237,89 @@ pub enum RouteType {
     UDP6
 }
 
-/// Represents a network route and its type, containing local address+port and remote address+port
+#[derive(Debug, Clone)]
+pub enum RouteStatus {
+    ESTABLISHED,
+    SYN_SENT,
+    SYN_RECEIVED,
+    FIN_WAIT1,
+    FIN_WAIT2,
+    TIME_WAIT,
+    CLOSED,
+    CLOSE_WAIT,
+    LAST_ACKNOWLEDGMENT,
+    LISTENING,
+    CLOSING,
+    NEW_SYN_RECEIVED
+}
+
+impl RouteStatus {
+    fn fromTcpCode(code: &str) -> RouteStatus {
+        if code == "01" {
+            return RouteStatus::ESTABLISHED
+
+        } else if code == "02" {
+            return RouteStatus::SYN_SENT
+
+        } else if code == "03" {
+            return RouteStatus::SYN_RECEIVED
+
+        } else if code == "04" {
+            return RouteStatus::FIN_WAIT1
+
+        } else if code == "05" {
+            return RouteStatus::FIN_WAIT2
+
+        } else if code == "06" {
+            return RouteStatus::TIME_WAIT
+
+        } else if code == "07" {
+            return RouteStatus::CLOSED
+
+        } else if code == "08" {
+            return RouteStatus::CLOSE_WAIT
+
+        } else if code == "09" {
+            return RouteStatus::LAST_ACKNOWLEDGMENT
+
+        } else if code == "0A" {
+            return RouteStatus::LISTENING
+
+        } else if code == "0B" {
+            return RouteStatus::CLOSING
+
+        } else {
+            return RouteStatus::NEW_SYN_RECEIVED
+        }
+    }
+
+    fn toString(&self) -> String {
+        match self {
+            RouteStatus::ESTABLISHED => String::from("established"),
+            RouteStatus::SYN_SENT => String::from("syn sent"),
+            RouteStatus::SYN_RECEIVED => String::from("syn received"),
+            RouteStatus::FIN_WAIT1 => String::from("fin wait 1"),
+            RouteStatus::FIN_WAIT2 => String::from("fin wait 2"),
+            RouteStatus::TIME_WAIT => String::from("time wait"),
+            RouteStatus::CLOSED => String::from("closed"),
+            RouteStatus::CLOSE_WAIT => String::from("close wait"),
+            RouteStatus::LAST_ACKNOWLEDGMENT => String::from("last acknowledgment"),
+            RouteStatus::LISTENING => String::from("listening"),
+            RouteStatus::CLOSING => String::from("closing"),
+            RouteStatus::NEW_SYN_RECEIVED => String::from("new syn received")
+        }
+    }
+}
+
+/// Represents a network route and its type, containing local address+port, remote address+port and connection status
 #[derive(Debug, Clone)]
 pub struct NetworkRoute {
     pub routeType: RouteType,
     pub localAddress: String,
     pub localPort: u16,
     pub remoteAddress: String,
-    pub remotePort: u16
+    pub remotePort: u16,
+    pub routeStatus: RouteStatus
 }
 
 /// Contains currently active clock source and the available ones
@@ -397,12 +474,14 @@ pub struct Backlight {
 }
 
 /// Holds data structure for average load
+#[derive(Debug)]
 pub struct Load {
     pub oneMinute: f32,
     pub fiveMinutes: f32,
     pub fifteenMinutes: f32
 }
 
+/// Holds information related to an IP address
 #[derive(Debug)]
 pub struct IPv4 {
     pub address: String,
@@ -421,6 +500,46 @@ impl fmt::Display for IPv4 {
 impl IPv4 {
     pub fn to_string(&self) -> String {
         format!("{}/{}", self.address, self.cidr)
+    }
+}
+
+/// Contains the information regarding a bus input
+#[derive(Debug)]
+pub struct BusInput {
+    pub bus: u16,
+    pub vendor: u16,
+    pub product: u16,
+    pub version: u16,
+    pub name: String,
+    pub physicalPath: String,
+    pub sysfsPath: String,
+    pub uniqueIdentifier: String,
+    pub handles: Vec<String>,
+    pub properties: usize,
+    pub events: usize,
+    pub keys: Vec<String>,
+    pub miscellaneousEvents: usize,
+    pub led: usize
+}
+
+impl BusInput {
+    fn new() -> BusInput {
+        BusInput {
+            bus: 0,
+            vendor: 0,
+            product: 0,
+            version: 0,
+            name: String::new(),
+            physicalPath: String::new(),
+            sysfsPath: String::new(),
+            uniqueIdentifier: String::new(),
+            handles: Vec::<String>::new(),
+            properties: 0,
+            led: 0,
+            miscellaneousEvents: 0,
+            events: 0,
+            keys: Vec::<String>::new()
+        }
     }
 }
 
@@ -996,13 +1115,25 @@ fn getRoutes(file: String, separator: &str, routeType: RouteType) -> Vec<Network
         let remoteAddress = bytesToAddress(remote[0].to_string(), separator);
         let remotePort = bytesToPort(remote[1].to_string());
 
+        let statusCode = splittedLine[3].trim();
+
+        let status = {
+            if routeType == RouteType::TCP || routeType == RouteType::TCP6 {
+                RouteStatus::fromTcpCode(statusCode)
+
+            } else {
+                RouteStatus::LISTENING
+            }
+        };
+
         routes.push(
             NetworkRoute {
                 routeType: routeType.clone(),
                 localAddress: localAddress,
                 localPort: localPort,
                 remoteAddress: remoteAddress,
-                remotePort: remotePort
+                remotePort: remotePort,
+                routeStatus: status
             }
         );
     }
@@ -1013,7 +1144,6 @@ fn getRoutes(file: String, separator: &str, routeType: RouteType) -> Vec<Network
 /// Returns a list of each internal network route
 pub fn networkRoutes() -> Vec<NetworkRoute> {
     linuxCheck();
-
     let mut routes: Vec<NetworkRoute> = Vec::<NetworkRoute>::new();
 
     routes.append(
@@ -1131,7 +1261,7 @@ fn bytesToU64(bytes: Vec<u8>) -> u64 {
 }
 
 /// Returns metrics parameters from the amdgpu driver
-pub fn gpuMetrics() -> Option<GpuMetrics>   {
+pub fn gpuMetrics() -> Option<GpuMetrics> {
     linuxCheck();
 
     let filePipe = fs::read(path::Path::new("/sys/class/drm/card0/device/gpu_metrics"));
@@ -1666,6 +1796,133 @@ pub fn getIPv4() -> Vec<IPv4> {
     return ipv4Addresses;
 }
 
+fn hexToUsize(hexadecimal: String) -> usize {
+    let mut hexaTable: HashMap<&str, usize> = HashMap::new();
+    hexaTable.insert("0", 0);
+    hexaTable.insert("1", 1);
+    hexaTable.insert("2", 2);
+    hexaTable.insert("3", 3);
+    hexaTable.insert("4", 4);
+    hexaTable.insert("5", 5);
+    hexaTable.insert("6", 6);
+    hexaTable.insert("7", 7);
+    hexaTable.insert("8", 8);
+    hexaTable.insert("9", 9);
+    hexaTable.insert("a", 10);
+    hexaTable.insert("b", 11);
+    hexaTable.insert("c", 12);
+    hexaTable.insert("d", 13);
+    hexaTable.insert("e", 14);
+    hexaTable.insert("f", 15);
+    hexaTable.insert("A", 10);
+    hexaTable.insert("B", 11);
+    hexaTable.insert("C", 12);
+    hexaTable.insert("D", 13);
+    hexaTable.insert("E", 14);
+    hexaTable.insert("F", 15);
+
+    let hex = hexadecimal.clone();
+
+    let mut power = hex.len();
+    let mut res: usize = 0;
+
+    for chr in hex.chars() {
+        let char = chr.to_string();
+
+        res += hexaTable.get(char.as_str()).unwrap() * (16_i32.pow(power as u32) as usize);
+        power -= 1;
+    }
+
+    return res
+}
+
+/// Returns a vector containing all the bus inputs found in procfs
+pub fn busInput() -> Vec<BusInput> {
+    let mut inputs = Vec::<BusInput>::new();
+    let fileContent = readFile("/proc/bus/input/devices");
+
+    for chunk in fileContent.split("\n\n") {
+        if chunk.trim().is_empty() {
+            continue;
+        }
+
+        let mut bus = BusInput::new();
+        for line in chunk.trim().split("\n") {
+
+            if line.contains("I: ") {
+                for block in line.trim().split(" ") {
+                    if block.contains("Bus=") {
+                        bus.bus = hexToUsize(block.replace("Bus=", "")) as u16;
+
+                    } else if block.contains("Vendor=") {
+                        bus.vendor = hexToUsize(block.replace("Vendor=", "")) as u16;
+
+                    } else if block.contains("Version=") {
+                        bus.version = hexToUsize(block.replace("Version=", "")) as u16;
+
+                    } else if block.contains("Product=") {
+                        bus.product = hexToUsize(block.replace("Product=", "")) as u16;
+                    }
+                }
+            } else if line.contains("N: Name=") {
+                bus.name = line.replace("N: Name=", "").replace("\"", "");
+
+            } else if line.contains("P: Phys=") {
+                bus.physicalPath = line.replace("P: Phys=", "");
+
+            } else if line.contains("S: Sysfs=") {
+                bus.sysfsPath = line.replace("S: Sysfs=", "/sys");
+
+            } else if line.contains("U: Uniq=") {
+                bus.uniqueIdentifier = line.replace("U: Uniq=", "");
+
+            } else if line.contains("H: Handlers=") {
+                bus.handles = {
+                    let mut binding = Vec::<String>::new();
+
+                    for handler in line.replace("H: Handlers=", "").split(" ") {
+                        if handler.is_empty() {
+                            continue
+                        }
+
+                        binding.push(handler.to_string())
+                    }
+
+                    binding
+                };
+
+            } else if line.contains("B: PROP=") {
+                bus.properties = hexToUsize(line.replace("B: PROP=", ""));
+
+            } else if line.contains("B: EV=") {
+                bus.events = hexToUsize(line.replace("B: EV=", ""));
+
+            } else if line.contains("B: KEY=") {
+                bus.keys = {
+                    let mut binding = Vec::<String>::new();
+
+                    for key in line.replace("B: KEY=", "").split(" ") {
+                        binding.push(key.to_string());
+                    }
+
+                    binding
+                };
+
+            } else if line.contains("B: MSC=") {
+                bus.miscellaneousEvents = hexToUsize(line.replace("B: MSC=", ""));
+
+            } else if line.contains("B: LED=") {
+                bus.led = hexToUsize(line.replace("B: LED=", ""));
+            }
+        }
+
+        inputs.push(bus);
+    }
+
+    return inputs
+}
+
+/// Returns a `rsjson::Json` object containing all the data which `sysutil` can extract
 pub fn exportJson() -> rsjson::Json {
     let mut json = rsjson::Json::new();
 
@@ -2179,6 +2436,11 @@ pub fn exportJson() -> rsjson::Json {
             NodeContent::Int(route.remotePort as usize)
         ));
 
+        routeNodeContent.addNode(Node::new(
+            "route-status",
+            NodeContent::String(route.routeStatus.toString())
+        ));
+
         networkRoutesNodeConent.push(NodeContent::Json(routeNodeContent));
     }
 
@@ -2383,6 +2645,99 @@ pub fn exportJson() -> rsjson::Json {
         NodeContent::List(ipv4NodeContent)
     ));
 
+    let mut busInputNodeContent = Vec::<NodeContent>::new();
+    for input in busInput() {
+        let mut inputNode = rsjson::Json::new();
+
+        inputNode.addNode(Node::new(
+            "bus",
+            NodeContent::Int(input.bus as usize)
+        ));
+
+        inputNode.addNode(Node::new(
+            "vendor",
+            NodeContent::Int(input.vendor as usize)
+        ));
+
+        inputNode.addNode(Node::new(
+            "product",
+            NodeContent::Int(input.product as usize)
+        ));
+
+        inputNode.addNode(Node::new(
+            "version",
+            NodeContent::Int(input.version as usize)
+        ));
+
+        inputNode.addNode(Node::new(
+            "physical-path",
+            NodeContent::String(input.physicalPath)
+        ));
+
+        inputNode.addNode(Node::new(
+            "sysfs-path",
+            NodeContent::String(input.sysfsPath)
+        ));
+
+        inputNode.addNode(Node::new(
+            "name",
+            NodeContent::String(input.name)
+        ));
+
+        inputNode.addNode(Node::new(
+            "handles",
+            NodeContent::List({
+                let mut binding = Vec::<NodeContent>::new();
+
+                for handle in input.handles {
+                    binding.push(NodeContent::String(handle));
+                }
+
+                binding
+            })
+        ));
+
+        inputNode.addNode(Node::new(
+            "properties",
+            NodeContent::Int(input.properties as usize)
+        ));
+
+        inputNode.addNode(Node::new(
+            "events",
+            NodeContent::Int(input.events as usize)
+        ));
+
+        inputNode.addNode(Node::new(
+            "keys",
+            NodeContent::List({
+                let mut binding = Vec::<NodeContent>::new();
+
+                for key in input.keys {
+                    binding.push(NodeContent::String(key));
+                }
+
+                binding
+            })
+        ));
+
+        inputNode.addNode(Node::new(
+            "miscellaneous-events",
+            NodeContent::Int(input.miscellaneousEvents as usize)
+        ));
+
+        inputNode.addNode(Node::new(
+            "led",
+            NodeContent::Int(input.led as usize)
+        ));
+
+        busInputNodeContent.push(NodeContent::Json(inputNode));
+    }
+
+    json.addNode(Node::new(
+        "bus-input",
+        NodeContent::List(busInputNodeContent)
+    ));
+
     return json
 }
 
@@ -2392,7 +2747,7 @@ mod tests {
 
     #[test]
     fn test() {
-        /*println!("{:?}", cpuUsage());
+        println!("{:?}", cpuUsage());
         println!("RAM usage: {:?}", ramUsage());
 
         println!("{:?}", networkRate().download / 1024_f32 / 1024_f32);
@@ -2422,18 +2777,15 @@ mod tests {
         println!("{:?}", nvmeDevices());
         println!("{:?}", storageDevices());
 
-        println!("{:?}", getBacklight());*/
+        println!("{:?}", getBacklight());
+        println!("{:?}", getLoad());
 
-        /*let json = exportJson();
+        println!("{:?}", getIPv4());
+        println!("{:?}", busInput());
 
-        println!("{:?}", json);
-        json.writeToFile("test.json");*/
+        let j = exportJson();
+        j.writeToFile("file.json");
 
-        let ips = getIPv4();
-        println!("{:?}", ramSize());
-
-        println!("{:?}", ips.get(0).unwrap());
-        //println!("{:?}", cpuInfo());
         assert_eq!(0_u8, 0_u8);
     }
 }
