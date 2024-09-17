@@ -1709,6 +1709,7 @@ fn netmaskFromCidr(cidr: u8) -> String {
 
 /// Returns the various ip addresses associated to the various network interfaces in the device
 pub fn getIPv4() -> Vec<IPv4> {
+    println!("a");
     let mut ipv4Addresses = Vec::<IPv4>::new();
     let mut addresses = Vec::<(String, String, String, String)>::new();
 
@@ -1716,36 +1717,38 @@ pub fn getIPv4() -> Vec<IPv4> {
     let fibTrie = readFile("/proc/net/fib_trie");
 
     let mut index: usize = 0;
-    let lines = fibTrie.split("|--").collect::<Vec<&str>>();
+    let lines = fibTrie.split("\n").collect::<Vec<&str>>();
 
     while index < lines.len() {
         let line = lines.get(index).unwrap().to_string();
-        let chunks = line.split("\n").collect::<Vec<&str>>();
-
-        let address = chunks.get(0).unwrap().trim().to_string();
-        let addressType = chunks.get(1).unwrap().trim().to_string();
-
-        if addressType.contains("/32 host LOCAL") && addresses.iter().find(|x| &x.0 == &address) == None {
-            let broadcast = {
-                let binding = lines.get(index+1).unwrap().to_string();
-
-                let splitted = binding.split("\n").collect::<Vec<&str>>(); //.trim()
-                splitted.get(0).unwrap().trim().to_string()
-            };
-
-            let binding = lines.get(index-1).unwrap().to_string();
-            let splitted = binding.split("\n").collect::<Vec<&str>>();
-
-            let cidrBinding = splitted.get(1).unwrap().trim().to_string();
-            let splittedCidr = cidrBinding.split(" ").collect::<Vec<&str>>();
-
-            let cidr = splittedCidr.get(0).unwrap().to_string().replace("/", "").to_string();
-
-            let netmask = netmaskFromCidr(cidr.parse::<u8>().unwrap());
-
-            addresses.push((address, broadcast, netmask, cidr));
-
+        
+        if !line.contains("link UNICAST") {
+            index += 1;
+            continue
         }
+        
+        let cidr = line.trim().get(1..3).unwrap().to_string();
+        
+        index += 1;
+        let binding = lines.get(index).unwrap().to_string().replace("|--", "");
+        if binding.contains("+") {
+            index += 1;
+            continue
+        }
+
+        let address = binding.trim().to_string();
+
+        while index < lines.len() && !lines.get(index).unwrap().contains("host LOCAL") {
+            index += 1;
+        }
+
+        index += 1;
+        let binding = lines.get(index).unwrap().replace("|--", "");
+
+        let broadcast = binding.trim().to_string();
+        let netmask = netmaskFromCidr(cidr.parse::<u8>().unwrap());
+
+        addresses.push((address, broadcast, netmask, cidr));
         index += 1;
     }
 
@@ -2747,7 +2750,7 @@ mod tests {
 
     #[test]
     fn test() {
-        println!("{:?}", cpuUsage());
+        /*println!("{:?}", cpuUsage());
         println!("RAM usage: {:?}", ramUsage());
 
         println!("{:?}", networkRate().download / 1024_f32 / 1024_f32);
@@ -2778,13 +2781,13 @@ mod tests {
         println!("{:?}", storageDevices());
 
         println!("{:?}", getBacklight());
-        println!("{:?}", getLoad());
+        println!("{:?}", getLoad());*/
 
         println!("{:?}", getIPv4());
-        println!("{:?}", busInput());
+        /*println!("{:?}", busInput());
 
         let j = exportJson();
-        j.writeToFile("file.json");
+        j.writeToFile("file.json");*/
 
         assert_eq!(0_u8, 0_u8);
     }
