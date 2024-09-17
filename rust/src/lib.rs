@@ -1707,9 +1707,31 @@ fn netmaskFromCidr(cidr: u8) -> String {
     
 }
 
+fn makeu8Vec(ip: &String) -> Vec<u8> {
+    let splitted = ip.split(".");
+    let mut uIP = Vec::<u8>::new();
+
+    for octet in splitted {
+        uIP.push(octet.parse::<u8>().unwrap())
+    }
+
+    return uIP
+}
+
+fn ipToBaseNetwork(ip: &String, mask: &String) -> String {
+    let ipVec = makeu8Vec(ip);
+    let maskVec = makeu8Vec(mask);
+
+    let mut baseNetwork: Vec<String> = Vec::<String>::new();
+    for i in 0..4 {
+        baseNetwork.push((ipVec[i] & maskVec[i]).to_string());
+    }
+
+    return baseNetwork.join(".");
+}
+
 /// Returns the various ip addresses associated to the various network interfaces in the device
 pub fn getIPv4() -> Vec<IPv4> {
-    println!("a");
     let mut ipv4Addresses = Vec::<IPv4>::new();
     let mut addresses = Vec::<(String, String, String, String)>::new();
 
@@ -1721,18 +1743,21 @@ pub fn getIPv4() -> Vec<IPv4> {
 
     while index < lines.len() {
         let line = lines.get(index).unwrap().to_string();
-        
+
         if !line.contains("link UNICAST") {
             index += 1;
             continue
         }
-        
+
         let cidr = line.trim().get(1..3).unwrap().to_string();
-        
         index += 1;
         let binding = lines.get(index).unwrap().to_string().replace("|--", "");
+
         if binding.contains("+") {
             index += 1;
+            continue
+
+        } else if binding.contains("link UNICAST") {
             continue
         }
 
@@ -1752,6 +1777,8 @@ pub fn getIPv4() -> Vec<IPv4> {
         index += 1;
     }
 
+    let mut usedIps = Vec::<String>::new();
+
     for line in routeFile.split("\n") {
         if line.is_empty() ||  line.contains("Gateway") {
             continue
@@ -1767,21 +1794,23 @@ pub fn getIPv4() -> Vec<IPv4> {
         let mut mask = String::new();
         let mut cidr = String::new();
 
-
         for (address, broadcast, netmask, cidrMask) in &addresses {
-            let addressNetwork = {
-                let mut binding = address.split(".").collect::<Vec<&str>>();
 
-                binding[3] = "0";
-                binding.join(".")
-            };
 
-            if &network == &addressNetwork {
+            let baseAddress = ipToBaseNetwork(address, netmask);
+            if &network == &baseAddress {
+                if usedIps.contains(address) {
+                    break
+                }
+
                 brd = broadcast.to_string();
                 ip = address.to_string();
 
                 mask = netmask.to_string();
                 cidr = cidrMask.to_string();
+
+                usedIps.push(ip.clone());
+                break
             }
         }
 
