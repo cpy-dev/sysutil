@@ -26,6 +26,8 @@
 use std::{fmt, fs};
 use std::cmp::PartialEq;
 use std::collections::HashMap;
+use std::ffi::OsString;
+use std::fs::DirEntry;
 use std::io::Read;
 use std::path;
 use std::process::Command;
@@ -541,6 +543,19 @@ impl BusInput {
             keys: Vec::<String>::new()
         }
     }
+}
+
+#[derive(Debug, Clone)]
+pub enum InterfaceType {
+    Physical, Virtual
+}
+
+/// Contains information about network interfaces
+#[derive(Debug, Clone)]
+pub struct NetworkInterface {
+    name: String,
+    macAddress: String,
+    interfaceType: InterfaceType
 }
 
 fn linuxCheck() {
@@ -1954,6 +1969,39 @@ pub fn busInput() -> Vec<BusInput> {
     return inputs
 }
 
+/// Returns a vetor containing all network interfaces found in sysfs
+pub fn networkInterfaces() -> Vec<NetworkInterface> {
+    let baseDirectory = "/sys/class/net";
+    let mut interfaces = Vec::new();
+
+    for directory in fs::read_dir(baseDirectory).unwrap() {
+        let dir = directory.unwrap();
+
+        let name = dir.file_name().to_str().unwrap().to_string();
+        let path = dir.path().to_str().unwrap().to_string();
+
+        let mac = fs::read_to_string(format!("{}/address", path)).unwrap().trim().to_string();
+
+        let mut interfaceType = InterfaceType::Virtual;
+        let directoryContent = fs::read_dir(path).unwrap();
+
+        for entry in directoryContent {
+            if ["phydev", "phy80211"].contains(&entry.unwrap().file_name().to_str().unwrap()) {
+                interfaceType = InterfaceType::Physical;
+                break;
+            }
+        }
+
+        interfaces.push(NetworkInterface {
+            name: name,
+            interfaceType: interfaceType,
+            macAddress: mac
+        });
+    }
+
+    return interfaces;
+}
+
 /// Returns a `rsjson::Json` object containing all the data which `sysutil` can extract
 pub fn exportJson() -> rsjson::Json {
     let mut json = rsjson::Json::new();
@@ -2770,6 +2818,36 @@ pub fn exportJson() -> rsjson::Json {
         NodeContent::List(busInputNodeContent)
     ));
 
+    let netIfaces = networkInterfaces();
+    let mut ifacesNodeContent = rsjson::Json::new();
+
+    for iface in netIfaces {
+        let mut ifaceNodeContent = rsjson::Json::new();
+
+        ifaceNodeContent.addNode(Node::new(
+            "mac",
+            NodeContent::String(iface.macAddress)
+        ));
+
+        ifaceNodeContent.addNode(Node::new(
+            "interface-type",
+            NodeContent::String(match iface.interfaceType {
+                InterfaceType::Physical => String::from("physical"),
+                InterfaceType::Virtual => String::from("virtual")
+            })
+        ));
+
+        ifacesNodeContent.addNode(Node::new(
+            iface.name,
+            NodeContent::Json(ifaceNodeContent)
+        ));
+    }
+
+    json.addNode(Node::new(
+        "network-interfaces",
+        NodeContent::Json(ifacesNodeContent)
+    ));
+
     return json
 }
 
@@ -2812,11 +2890,13 @@ mod tests {
         println!("{:?}", getBacklight());
         println!("{:?}", getLoad());*/
 
-        println!("{:?}", getIPv4());
+        //println!("{:?}", getIPv4());
         /*println!("{:?}", busInput());
 
         let j = exportJson();
         j.writeToFile("file.json");*/
+
+        println!("{:?}", networkInterfaces());
 
         assert_eq!(0_u8, 0_u8);
     }
