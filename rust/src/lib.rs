@@ -26,8 +26,6 @@
 use std::{fmt, fs};
 use std::cmp::PartialEq;
 use std::collections::HashMap;
-use std::ffi::OsString;
-use std::fs::DirEntry;
 use std::io::Read;
 use std::path;
 use std::process::Command;
@@ -553,9 +551,9 @@ pub enum InterfaceType {
 /// Contains information about network interfaces
 #[derive(Debug, Clone)]
 pub struct NetworkInterface {
-    name: String,
-    macAddress: String,
-    interfaceType: InterfaceType
+    pub name: String,
+    pub macAddress: String,
+    pub interfaceType: InterfaceType
 }
 
 fn linuxCheck() {
