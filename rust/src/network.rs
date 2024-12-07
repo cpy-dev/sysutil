@@ -405,6 +405,16 @@ fn getRoutes(file: String, separator: &str, routeType: RouteType) -> Vec<Network
 pub fn networkInterfaces() -> Vec<NetworkInterface> {
     let baseDirectory = "/sys/class/net";
     let mut interfaces = Vec::new();
+    
+    let virtualInterfaces = {
+        let mut ifaces = Vec::<String>::new();
+        
+        for iface in fs::read_dir("/sys/devices/virtual/net").unwrap() {
+            ifaces.push(iface.unwrap().file_name().to_str().unwrap().to_string());
+        }
+        
+        ifaces
+    };
 
     for directory in fs::read_dir(baseDirectory).unwrap() {
         let dir = directory.unwrap();
@@ -414,15 +424,20 @@ pub fn networkInterfaces() -> Vec<NetworkInterface> {
 
         let mac = fs::read_to_string(format!("{}/address", path)).unwrap().trim().to_string();
 
-        let mut interfaceType = InterfaceType::Virtual;
-        let directoryContent = fs::read_dir(path).unwrap();
+        let mut interfaceType = InterfaceType::Physical;
+        
+        if virtualInterfaces.contains(&name) {
+            interfaceType = InterfaceType::Virtual;
+        }
+        
+        /*let directoryContent = fs::read_dir(path).unwrap();
 
         for entry in directoryContent {
             if ["phydev", "phy80211"].contains(&entry.unwrap().file_name().to_str().unwrap()) {
                 interfaceType = InterfaceType::Physical;
                 break;
             }
-        }
+        }*/
 
         interfaces.push(NetworkInterface {
             name: name,

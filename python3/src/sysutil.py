@@ -3,6 +3,9 @@ import os
 import sys
 import time
 
+from dbus.service import Interface
+
+
 class BatteryStatus:
     Charging = 'charging'
     Discharging = 'discharging'
@@ -317,6 +320,16 @@ class BusInput:
     keys: [str]
     miscellaneousEvents: int
     led: int
+
+class InterfaceType:
+    PHYSICAL = 'physical'
+    VIRTUAL = 'virtual'
+
+@dataclasses.dataclass
+class NetowrkInterface:
+    name: str
+    macAddress: str
+    interfaceType: str
 
 def __linuxCheck():
     if not os.path.exists('/sys') or not os.path.exists('/proc'):
@@ -1400,6 +1413,27 @@ def busInput():
 
     return inputs
 
+def networkInterfaces():
+    baseDirectory = '/sys/class/net'
+    interfaces = []
+
+    for directory in os.listdir(baseDirectory):
+        name = directory
+        path = f'{baseDirectory}/{name}'
+
+        with open(f'{path}/address', 'r') as file:
+            mac = file.read().strip()
+
+        interfaceType = InterfaceType.VIRTUAL
+        directoryContent = os.listdir(path)
+
+        if 'phydev' in directoryContent or 'phy80211' in directoryContent:
+             interfaceType = InterfaceType.PHYSICAL
+
+        interfaces.append(NetowrkInterface(name=name, macAddress=mac, interfaceType=interfaceType))
+
+    return interfaces
+
 def exportJson():
     json = {}
 
@@ -1596,6 +1630,13 @@ def exportJson():
             }
         )
 
+    json['network-interfaces'] = {}
+    for interface in networkInterfaces():
+        json['network-interfaces'][interface.name] = {
+            'mac' : interface.macAddress,
+            'interface-type' : interface.interfaceType
+        }
+
     return json
 
 if __name__ == '__main__':
@@ -1631,6 +1672,8 @@ if __name__ == '__main__':
 
     print(getLoad())
     print(getIPv4())
+
+    print(networkInterfaces())
 
     print(busInput())
     print(exportJson())

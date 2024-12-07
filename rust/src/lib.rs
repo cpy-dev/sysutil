@@ -929,7 +929,7 @@ mod tests {
         let j = exportJson();
         j.writeToFile("file.json");*/
 
-        println!("{:?}", gpu::gpuMetrics());
+        println!("{:?}", network::networkInterfaces());
 
         assert_eq!(0_u8, 0_u8);
     }
