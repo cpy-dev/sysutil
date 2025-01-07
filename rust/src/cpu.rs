@@ -1,7 +1,10 @@
 use std::{fs, path, thread};
+use std::collections::HashMap;
 use std::process::Command;
 use std::time::Duration;
 use crate::utils::{*};
+use regex;
+use regex::Regex;
 
 /// Contains the average CPU usage and the discrete usage for each processor
 #[derive(Debug, Clone)]
@@ -517,4 +520,90 @@ pub fn getLoad() -> Load {
         fiveMinutes: binding.get(1).unwrap().parse::<f32>().unwrap(),
         fifteenMinutes: binding.get(2).unwrap().parse::<f32>().unwrap()
     }
+}
+
+/// Returns a HashMap containing the size (in ByteSize) for each cache level
+pub fn cacheLevels() -> HashMap<String, ByteSize> {
+    let baseDir = "/sys/devices/system/cpu";
+    let mut cpus = Vec::<String>::new();
+
+    let pattern = regex::Regex::new(r"cpu[0-9]{1,3}").unwrap();
+
+    for element in std::fs::read_dir(baseDir).unwrap() {
+        let name = element.unwrap().file_name().to_str().unwrap().to_string();
+        match pattern.captures(&name) {
+            Some(_) => {
+                cpus.push(name);
+            },
+
+            None => {
+
+            }
+        }
+    }
+
+    let mut cacheLevels = HashMap::<String, Vec<(String, String)>>::new();
+
+    for cpu in cpus {
+        let mut cacheDirs = Vec::<String>::new();
+
+        let pattern = regex::Regex::new(r"index[0-9]{1}").unwrap();
+
+        for element in std::fs::read_dir(format!("{}/{}/cache/", baseDir, cpu)).unwrap() {
+            let name = element.unwrap().file_name().to_str().unwrap().to_string();
+            match pattern.captures(&name) {
+                Some(_) => {
+                    cacheDirs.push(name);
+                },
+                None => {}
+            }
+        }
+
+        for directory in cacheDirs {
+            let level = readFile(format!("{}/{}/cache/{}/level", baseDir, cpu, directory));
+            let size = readFile(format!("{}/{}/cache/{}/size", baseDir, cpu, directory));
+            let shared = readFile(format!("{}/{}/cache/{}/shared_cpu_list", baseDir, cpu, directory));
+
+            if !cacheLevels.contains_key(&level) {
+                cacheLevels.insert(level, vec![(size, shared)]);
+
+            } else {
+                if cacheLevels.get_mut(&level).unwrap().contains(&(size.clone(), shared.clone())) {
+                    let mut list = cacheLevels.get(&level).unwrap().clone();
+                    cacheLevels.remove(&level);
+
+                    list.push((size, shared));
+                    cacheLevels.insert(level, list);
+                }
+            }
+
+        }
+    }
+
+    let mut levels = HashMap::<String, ByteSize>::new();
+    for level in cacheLevels.keys() {
+        let mut totalSize: usize = 0;
+
+        let chunks = cacheLevels.get(level);
+        for chunk in chunks {
+            let (size, _) = chunk.first().unwrap();
+
+            let intSize = {
+                if size.contains("K") {
+                    size.replace("K", "").parse::<usize>().unwrap() * 1024
+
+                } else if size.contains("M") {
+                    size.replace("M", "").parse::<usize>().unwrap() * 1024
+                } else {
+                    size.parse::<usize>().unwrap()
+                }
+            };
+
+            totalSize += intSize;
+        }
+
+        levels.insert(level.to_string(), ByteSize::fromBytes(totalSize));
+    }
+
+    return levels;
 }

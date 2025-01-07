@@ -974,8 +974,10 @@ mod tests {
         //println!("{:?}", getIPv4());
         /*println!("{:?}", busInput());*/
 
-        let j = exportJson();
-        j.writeToFile("file.json");
+        /*let j = exportJson();
+        j.writeToFile("file.json");*/
+
+        println!("{:?}", cpu::cacheLevels());
 
         assert_eq!(0_u8, 0_u8);
     }
