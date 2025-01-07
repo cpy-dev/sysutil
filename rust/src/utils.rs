@@ -2,6 +2,102 @@ use std::path;
 use std::fs;
 use std::io::Read;
 
+/// Byte measure unit
+pub enum ByteUnit {
+    B, KB, MB, GB,
+    KiB, MiB, GiB
+}
+
+impl ByteUnit {
+    pub fn toString(&self) -> String {
+        match self {
+            ByteUnit::B => "B".to_string(),
+            ByteUnit::KB => "KB".to_string(),
+            ByteUnit::MB => "MB".to_string(),
+            ByteUnit::GB => "GB".to_string(),
+            ByteUnit::KiB => "KiB".to_string(),
+            ByteUnit::MiB => "MiB".to_string(),
+            ByteUnit::GiB => "GiB".to_string(),
+        }
+    }
+}
+
+/// Data structure implementing conversion for the various measure units
+#[derive(Debug)]
+pub struct ByteSize {
+    bytes: usize
+}
+
+impl ByteSize {
+    pub fn fromBytes(bytes: usize) -> Self {
+        Self {
+            bytes: bytes
+        }
+    }
+
+    pub fn b(&self) -> usize {
+        self.bytes * 8
+    }
+
+    pub fn B(&self) -> usize {
+        self.bytes
+    }
+
+    pub fn KB(&self) -> f32 {
+        (self.bytes as f32) / 1000_f32
+    }
+
+    pub fn KiB(&self) -> f32 {
+        (self.bytes as f32) / 1024_f32
+    }
+
+    pub fn MB(&self) -> f32 {
+        self.KB() / 1000_f32
+    }
+
+    pub fn MiB(&self) -> f32 {
+        self.KiB() / 1024_f32
+    }
+
+    pub fn GB(&self) -> f32 {
+        self.MB() / 1000_f32
+    }
+
+    pub fn GiB(&self) -> f32 {
+        self.MiB() / 1024_f32
+    }
+
+    pub fn fitBase1024(&self) -> (f32, ByteUnit) {
+        if self.B() < 1024 {
+            (self.B() as f32, ByteUnit::B)
+
+        } else if self.KiB() < 1024_f32 {
+            (self.KiB(), ByteUnit::KiB)
+
+        } else if self.MiB() < 1024_f32 {
+            (self.MiB(), ByteUnit::MiB)
+
+        } else {
+            (self.GiB(), ByteUnit::GiB)
+        }
+    }
+
+    pub fn fitBase1000(&self) -> (f32, ByteUnit) {
+        if self.B() < 1000 {
+            (self.B() as f32, ByteUnit::B)
+
+        } else if self.KB() < 1000_f32 {
+            (self.KB(), ByteUnit::KB)
+
+        } else if self.MB() < 1000_f32 {
+            (self.MB(), ByteUnit::MB)
+
+        } else {
+            (self.GB(), ByteUnit::GB)
+        }
+    }
+}
+
 pub fn linuxCheck() {
     if !path::Path::new("/sys").exists() || !path::Path::new("/proc").exists() {
         panic!("Detected non-Linux system");

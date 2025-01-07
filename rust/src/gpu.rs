@@ -1,4 +1,5 @@
 use std::{fs, path};
+use std::fs::read_dir;
 use crate::utils::{*};
 
 /// Encloses gpu metrics parameters
@@ -25,13 +26,6 @@ pub struct GpuMetrics {
     pub currentFanSpeed: u16,
     pub pcieLinkWidth: u16,
     pub pcieLinkSpeed: u16,
-}
-
-/// Contains total gpu's vram size, both in GB (1000^3 bytes) and GiB (1024^3 bytes)
-#[derive(Debug, Clone)]
-pub struct VramSize {
-    pub gb: f32,
-    pub gib: f32
 }
 
 /// returns current GPU usage in percentage, returns `None` if it's not possible to retrieve data
@@ -131,8 +125,28 @@ pub fn gpuMetrics() -> Option<GpuMetrics> {
     )
 }
 
-/// Returns gpu's vram size as specified in `VramSize` struct, returns `None` if it's not possible to retrieve data
-pub fn vramSize() -> Option<VramSize> {
+/// Contains all information about VRAM
+#[derive(Debug)]
+pub struct VRAM {
+    pub size: Option<ByteSize>,
+    pub usage: Option<f32>,
+    pub frequency: Option<usize>,
+    pub busWidth: Option<usize>
+}
+
+impl VRAM {
+    pub fn new() -> Self {
+        Self {
+            size: vramSize(),
+            usage: vramUsage(),
+            frequency: vramFrequency(),
+            busWidth: vramBusWidth()
+        }
+    }
+}
+
+/// Returns gpu's vram size as specified in `ByteSize` struct, returns `None` if it's not possible to retrieve data
+pub fn vramSize() -> Option<ByteSize> {
     linuxCheck();
 
     let fileContent = readFile("/sys/class/drm/card0/device/mem_info_vram_total");
@@ -141,10 +155,7 @@ pub fn vramSize() -> Option<VramSize> {
             return None
         },
         Ok(uMem) => {
-            return Some(VramSize {
-                gb: uMem as f32 / 1000_f32 / 1000_f32 / 1000_f32,
-                gib: uMem as f32 / 1024_f32 / 1024_f32 / 1024_f32
-            })
+            return Some(ByteSize::fromBytes(uMem))
         }
     };
 }
@@ -164,4 +175,114 @@ pub fn vramUsage() -> Option<f32> {
     let uVramUsed: usize = vramUsed.parse::<usize>().unwrap();
 
     return Some(uVramUsed as f32 * 100_f32 / uVramTotal as f32);
+}
+
+/// Returns VRAM frequency in MT/s
+pub fn vramFrequency() -> Option<usize> {
+    let kfdTopologyNodes = "/sys/class/kfd/kfd/topology/nodes/";
+    for dir in read_dir(kfdTopologyNodes).unwrap() {
+        let path = dir.unwrap().path();
+        let directory = path.to_str().unwrap();
+
+        let content = readFile(format!("{}/properties", directory));
+        let mut isGpu = false;
+
+        for line in content.split("\n") {
+            if line.contains("simd_count") {
+                let splitedLine = line.split(" ").collect::<Vec<&str>>();
+                match splitedLine.last() {
+                    Some(cores) => {
+                        if cores.parse::<usize>().unwrap() != 0 {
+                            isGpu = true;
+                        }
+                    },
+
+                    None => {
+                        continue
+                    }
+                }
+            }
+
+            if isGpu {
+                break
+            }
+        }
+
+        if isGpu {
+            let memBanksInfo = readFile(format!("{}/mem_banks/0/properties", directory));
+            let mut frequencyLine = String::new();
+
+            for line in memBanksInfo.split("\n") {
+                if line.contains("mem_clk_max") {
+                    frequencyLine = line.to_string();
+                    break
+                }
+            }
+
+            let frequency = {
+                let binding = frequencyLine.split(" ").collect::<Vec<&str>>();
+                let last = binding.last().unwrap();
+                last.parse::<usize>().unwrap()
+            };
+
+            return Some(frequency);
+        }
+    }
+
+    return None;
+}
+
+/// Returns VRAM bus width in bits
+pub fn vramBusWidth() -> Option<usize> {
+    let kfdTopologyNodes = "/sys/class/kfd/kfd/topology/nodes/";
+    for dir in read_dir(kfdTopologyNodes).unwrap() {
+        let path = dir.unwrap().path();
+        let directory = path.to_str().unwrap();
+
+        let content = readFile(format!("{}/properties", directory));
+        let mut isGpu = false;
+
+        for line in content.split("\n") {
+            if line.contains("simd_count") {
+                let splitedLine = line.split(" ").collect::<Vec<&str>>();
+                match splitedLine.last() {
+                    Some(cores) => {
+                        if cores.parse::<usize>().unwrap() != 0 {
+                            isGpu = true;
+                        }
+                    },
+
+                    None => {
+                        continue
+                    }
+                }
+            }
+
+            if isGpu {
+                break
+            }
+        }
+
+        if isGpu {
+            let memBanksInfo = readFile(format!("{}/mem_banks/0/properties", directory));
+            let mut widthLine = String::new();
+
+            for line in memBanksInfo.split("\n") {
+                if line.contains("width") {
+                    widthLine = line.to_string();
+                    break
+                }
+            }
+
+            let width = {
+                let binding = widthLine.split(" ").collect::<Vec<&str>>();
+                let last = binding.last().unwrap();
+                last.parse::<usize>().unwrap()
+            };
+
+            return Some(width);
+        }
+    }
+
+    return None;
 }

@@ -32,6 +32,7 @@ pub mod motherboard;
 pub mod sensors;
 pub mod bus;
 mod utils;
+pub use utils::{ByteSize, ByteUnit};
 
 use rsjson::{Json, Node, NodeContent};
 
@@ -220,23 +221,36 @@ pub fn exportJson() -> rsjson::Json {
     ));
 
     let mut ramNodeContent = Json::new();
-    let ramSize = ram::ramSize();
-
-    let ramUsage = ram::ramUsage();
+    let ram = ram::RAM::new();
 
     ramNodeContent.addNode(Node::new(
         "usage".to_string(),
-        NodeContent::Float(ramUsage)
-    ));
-
-    ramNodeContent.addNode(Node::new(
-        "size-gb".to_string(),
-        NodeContent::Float(ramSize.gb)
+        NodeContent::Float(ram.usage)
     ));
 
     ramNodeContent.addNode(Node::new(
         "size-gib".to_string(),
-        NodeContent::Float(ramSize.gib)
+        NodeContent::Float(ram.size.GiB())
+    ));
+
+    ramNodeContent.addNode(Node::new(
+        "frequency",
+        match ram.frequency {
+            Some(frequency) => {
+                NodeContent::Int(frequency)
+            },
+            None => NodeContent::Null
+        }
+    ));
+
+    ramNodeContent.addNode(Node::new(
+        "width",
+        match ram.busWidth {
+            Some(width) => {
+                NodeContent::Int(width)
+            },
+            None => NodeContent::Null
+        }
     ));
 
     json.addNode(Node::new(
@@ -594,31 +608,65 @@ pub fn exportJson() -> rsjson::Json {
         NodeContent::List(temperatureSensorsNodeContent)
     ));
 
-    match gpu::vramSize() {
-        None => {
-            json.addNode(Node::new(
-                "vram-size",
+    let mut vramNodeContent = Json::new();
+    let vram = gpu::VRAM::new();
+
+    vramNodeContent.addNode(Node::new(
+        "size-gib",
+        match vram.size {
+            Some(size) => {
+                NodeContent::Float(size.GiB())
+            },
+
+            None => {
                 NodeContent::Null
-            ));
-        },
-        Some(vram) => {
-            let mut vramSizeNodeContent = Json::new();
-            vramSizeNodeContent.addNode(Node::new(
-                "gb",
-                NodeContent::Float(vram.gb)
-            ));
-
-            vramSizeNodeContent.addNode(Node::new(
-                "gib",
-                NodeContent::Float(vram.gib)
-            ));
-
-            json.addNode(Node::new(
-                "vram-size",
-                NodeContent::Json(vramSizeNodeContent)
-            ));
+            }
         }
-    }
+    ));
+
+    vramNodeContent.addNode(Node::new(
+        "usage",
+        match vram.usage {
+            Some(usage) => {
+                NodeContent::Float(usage)
+            },
+
+            None => {
+                NodeContent::Null
+            }
+        }
+    ));
+
+    vramNodeContent.addNode(Node::new(
+        "frequency",
+        match vram.frequency {
+            Some(frequency) => {
+                NodeContent::Int(frequency)
+            },
+
+            None => {
+                NodeContent::Null
+            }
+        }
+    ));
+
+    vramNodeContent.addNode(Node::new(
+        "bus-width",
+        match vram.busWidth {
+            Some(width) => {
+                NodeContent::Int(width)
+            },
+
+            None => {
+                NodeContent::Null
+            }
+        }
+    ));
+
+    json.addNode(Node::new(
+        "vram",
+        NodeContent::Json(vramNodeContent)
+    ));
 
     match gpu::gpuMetrics() {
         None => {
@@ -924,12 +972,10 @@ mod tests {
         println!("{:?}", getLoad());*/
 
         //println!("{:?}", getIPv4());
-        /*println!("{:?}", busInput());
+        /*println!("{:?}", busInput());*/
 
         let j = exportJson();
-        j.writeToFile("file.json");*/
-
-        println!("{:?}", network::networkInterfaces());
+        j.writeToFile("file.json");
 
         assert_eq!(0_u8, 0_u8);
     }
